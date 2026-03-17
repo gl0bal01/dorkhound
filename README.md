@@ -173,6 +173,6 @@ dorkhound completion fish | source
 
 ## License
 
-MIT
+[MIT](LICENSE)
 
 [Releases]: https://github.com/gl0bal01/dorkhound/releases
