@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DORK Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: #0d1117;
+    color: #c9d1d9;
+    line-height: 1.6;
+    padding: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  h1 { color: #58a6ff; font-size: 1.8rem; margin-bottom: 4px; }
+  h2 { color: #58a6ff; font-size: 1.3rem; margin-bottom: 12px; }
+
+  .case-info {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+
+  .case-meta {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    color: #8b949e;
+  }
+
+  .case-meta span { font-size: 0.95rem; }
+  .case-meta strong { color: #c9d1d9; }
+
+  .toolbar {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+
+  .btn {
+    background: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.15s;
+  }
+
+  .btn:hover { background: #30363d; }
+  .btn-primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  .btn-primary:hover { background: #388bfd; }
+
+  .category-section {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+
+  .category-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    background: #1c2128;
+    border-bottom: 1px solid #30363d;
+  }
+
+  .category-title { font-weight: 600; color: #58a6ff; }
+
+  .link-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    border-bottom: 1px solid #21262d;
+    flex-wrap: wrap;
+  }
+
+  .link-row:last-child { border-bottom: none; }
+
+  .link-row select {
+    background: #0d1117;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.85rem;
+  }
+
+  .link-label {
+    min-width: 160px;
+    font-weight: 500;
+    flex-shrink: 0;
+    color: #c9d1d9;
+  }
+
+  .link-url {
+    color: #58a6ff;
+    text-decoration: none;
+    word-break: break-all;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .link-url:hover { text-decoration: underline; }
+
+  .btn-copy-small {
+    background: #21262d;
+    color: #8b949e;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    padding: 2px 8px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+  }
+
+  .btn-copy-small:hover { background: #30363d; color: #c9d1d9; }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #1f6feb;
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+
+const data = /*DATA_PLACEHOLDER*/{};
+
+function showToast(message) {
+  var el = document.getElementById("toast");
+  el.textContent = message;
+  el.classList.add("show");
+  setTimeout(function() { el.classList.remove("show"); }, 2000);
+}
+
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function() {
+      showToast("Copied to clipboard");
+    }).catch(function() {
+      showToast("Failed to copy");
+    });
+  } else {
+    showToast("Clipboard not available");
+  }
+}
+
+function buildCaseInfo(container, caseData) {
+  var section = document.createElement("div");
+  section.className = "case-info";
+
+  var h1 = document.createElement("h1");
+  h1.textContent = "OSINT Dashboard: " + (caseData.name || "Unknown");
+  section.appendChild(h1);
+
+  var meta = document.createElement("div");
+  meta.className = "case-meta";
+
+  if (caseData.location) {
+    var span = document.createElement("span");
+    var strong = document.createElement("strong");
+    strong.textContent = "Location: ";
+    span.appendChild(strong);
+    span.appendChild(document.createTextNode(caseData.location));
+    meta.appendChild(span);
+  }
+
+  if (caseData.age) {
+    var span = document.createElement("span");
+    var strong = document.createElement("strong");
+    strong.textContent = "Age: ";
+    span.appendChild(strong);
+    span.appendChild(document.createTextNode("~" + caseData.age));
+    meta.appendChild(span);
+  }
+
+  if (caseData.dob) {
+    var span = document.createElement("span");
+    var strong = document.createElement("strong");
+    strong.textContent = "DOB: ";
+    span.appendChild(strong);
+    span.appendChild(document.createTextNode(caseData.dob));
+    meta.appendChild(span);
+  }
+
+  section.appendChild(meta);
+  container.appendChild(section);
+}
+
+function buildToolbar(container, groups) {
+  var toolbar = document.createElement("div");
+  toolbar.className = "toolbar";
+
+  var exportBtn = document.createElement("button");
+  exportBtn.className = "btn btn-primary";
+  exportBtn.textContent = "Export to Discord";
+  exportBtn.addEventListener("click", function() { exportDiscord(groups); });
+  toolbar.appendChild(exportBtn);
+
+  var openAllBtn = document.createElement("button");
+  openAllBtn.className = "btn";
+  openAllBtn.textContent = "Open All in Browser";
+  openAllBtn.addEventListener("click", function() { openAllLinks(groups); });
+  toolbar.appendChild(openAllBtn);
+
+  container.appendChild(toolbar);
+}
+
+function exportDiscord(groups) {
+  var lines = [];
+  lines.push("## OSINT Results: " + (data.case_info.name || "Unknown"));
+
+  var metaParts = [];
+  if (data.case_info.location) { metaParts.push("**Location:** " + data.case_info.location); }
+  if (data.case_info.age) { metaParts.push("**Age:** ~" + data.case_info.age); }
+  if (data.case_info.dob) { metaParts.push("**DOB:** " + data.case_info.dob); }
+  if (metaParts.length > 0) { lines.push(metaParts.join(" | ")); }
+
+  var categoryKeys = Object.keys(groups);
+  for (var ci = 0; ci < categoryKeys.length; ci++) {
+    var cat = categoryKeys[ci];
+    var items = groups[cat];
+    var included = [];
+
+    for (var i = 0; i < items.length; i++) {
+      var selectEl = document.getElementById("status-" + cat + "-" + i);
+      var status = selectEl ? selectEl.value : "pending";
+      if (status === "pending" || status === "useful") {
+        included.push(items[i]);
+      }
+    }
+
+    if (included.length > 0) {
+      lines.push("");
+      lines.push("### " + cat.charAt(0).toUpperCase() + cat.slice(1) + " (" + included.length + " links)");
+      for (var j = 0; j < included.length; j++) {
+        lines.push("- " + included[j].label + ": " + included[j].url);
+      }
+    }
+  }
+
+  copyText(lines.join("\n"));
+}
+
+function openAllLinks(groups) {
+  var categoryKeys = Object.keys(groups);
+  for (var ci = 0; ci < categoryKeys.length; ci++) {
+    var items = groups[categoryKeys[ci]];
+    for (var i = 0; i < items.length; i++) {
+      window.open(items[i].url, "_blank");
+    }
+  }
+}
+
+function groupByCategory(results) {
+  var groups = {};
+  for (var i = 0; i < results.length; i++) {
+    var r = results[i];
+    var cat = r.category || "other";
+    if (!groups[cat]) { groups[cat] = []; }
+    groups[cat].push(r);
+  }
+  return groups;
+}
+
+function buildCategories(container, groups) {
+  var categoryKeys = Object.keys(groups);
+
+  for (var ci = 0; ci < categoryKeys.length; ci++) {
+    var cat = categoryKeys[ci];
+    var items = groups[cat];
+
+    var section = document.createElement("div");
+    section.className = "category-section";
+
+    var header = document.createElement("div");
+    header.className = "category-header";
+
+    var title = document.createElement("span");
+    title.className = "category-title";
+    title.textContent = cat.charAt(0).toUpperCase() + cat.slice(1) + " (" + items.length + ")";
+    header.appendChild(title);
+
+    var copyAllBtn = document.createElement("button");
+    copyAllBtn.className = "btn-copy-small";
+    copyAllBtn.textContent = "Copy all in category";
+    (function(catItems) {
+      copyAllBtn.addEventListener("click", function() {
+        var urls = [];
+        for (var k = 0; k < catItems.length; k++) {
+          urls.push(catItems[k].url);
+        }
+        copyText(urls.join("\n"));
+      });
+    })(items);
+    header.appendChild(copyAllBtn);
+
+    section.appendChild(header);
+
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+
+      var row = document.createElement("div");
+      row.className = "link-row";
+
+      var select = document.createElement("select");
+      select.id = "status-" + cat + "-" + i;
+
+      var options = ["pending", "useful", "dead end", "reviewed"];
+      for (var oi = 0; oi < options.length; oi++) {
+        var opt = document.createElement("option");
+        opt.value = options[oi];
+        opt.textContent = options[oi];
+        select.appendChild(opt);
+      }
+      row.appendChild(select);
+
+      var label = document.createElement("span");
+      label.className = "link-label";
+      label.textContent = item.label;
+      row.appendChild(label);
+
+      var link = document.createElement("a");
+      link.className = "link-url";
+      link.setAttribute("href", item.url);
+      link.setAttribute("target", "_blank");
+      link.setAttribute("rel", "noopener noreferrer");
+      link.textContent = item.url;
+      row.appendChild(link);
+
+      var copyBtn = document.createElement("button");
+      copyBtn.className = "btn-copy-small";
+      copyBtn.textContent = "Copy";
+      (function(url) {
+        copyBtn.addEventListener("click", function() { copyText(url); });
+      })(item.url);
+      row.appendChild(copyBtn);
+
+      section.appendChild(row);
+    }
+
+    container.appendChild(section);
+  }
+}
+
+function init() {
+  var app = document.getElementById("app");
+
+  var caseData = data.case_info || {};
+  var results = data.results || [];
+  var groups = groupByCategory(results);
+
+  buildCaseInfo(app, caseData);
+  buildToolbar(app, groups);
+  buildCategories(app, groups);
+}
+
+init();
+</script>
+</body>
+</html>
