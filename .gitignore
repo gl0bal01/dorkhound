@@ -1,3 +1,26 @@
 # Built binaries
 /dorkhound
 /dorkhound-*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+vendor/
+*.exe
+*.test
+*.out
+cover.out
+coverage.html
+
+# Environment
+.env
+.env.*

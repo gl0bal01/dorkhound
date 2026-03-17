@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	Register(generateSocialDorks)
+	register(generateSocialDorks)
 }
 
 func generateSocialDorks(c *caseinfo.Case) []Dork {

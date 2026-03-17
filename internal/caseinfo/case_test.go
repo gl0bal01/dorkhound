@@ -352,3 +352,33 @@ func TestMerge(t *testing.T) {
 		}
 	})
 }
+
+func TestSplitTrim(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{"empty string", "", nil},
+		{"single element", "social", []string{"social"}},
+		{"multiple elements", "us,ca,uk", []string{"us", "ca", "uk"}},
+		{"with whitespace", " us , ca , uk ", []string{"us", "ca", "uk"}},
+		{"trailing comma", "us,ca,", []string{"us", "ca"}},
+		{"all whitespace elements", " , , ", nil},
+		{"single with whitespace", "  social  ", []string{"social"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SplitTrim(tt.input)
+			if len(got) != len(tt.want) {
+				t.Fatalf("SplitTrim(%q) = %v (len %d), want %v (len %d)", tt.input, got, len(got), tt.want, len(tt.want))
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("SplitTrim(%q)[%d] = %q, want %q", tt.input, i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}

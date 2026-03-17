@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	Register(generateFinancialDorks)
+	register(generateFinancialDorks)
 }
 
 func generateFinancialDorks(c *caseinfo.Case) []Dork {

@@ -9,21 +9,21 @@ import (
 )
 
 // CSV writes dorks to w in CSV format with a header row.
-// Columns: label, category, priority, url.
+// Columns: label, category, region, priority, query, url.
 func CSV(w io.Writer, dorks []dork.Dork, engine string) error {
 	cw := csv.NewWriter(w)
 
-	// Write header
-	if err := cw.Write([]string{"label", "category", "priority", "url"}); err != nil {
+	if err := cw.Write([]string{"label", "category", "region", "priority", "query", "url"}); err != nil {
 		return fmt.Errorf("writing CSV header: %w", err)
 	}
 
-	// Write data rows
 	for _, d := range dorks {
 		row := []string{
 			d.Label,
 			d.Category,
+			d.Region,
 			fmt.Sprintf("%d", d.Priority),
+			d.Query,
 			d.URL(engine),
 		}
 		if err := cw.Write(row); err != nil {

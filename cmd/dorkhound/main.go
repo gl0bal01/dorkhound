@@ -53,7 +53,6 @@ func run(cmd *cobra.Command, args []string) error {
 	flagDelay, _ := cmd.Flags().GetInt("delay")
 	flagInteractive, _ := cmd.Flags().GetBool("interactive")
 
-	// 10. Interactive mode: prompt the user for all inputs.
 	var c *caseinfo.Case
 	if flagInteractive {
 		result, err := interactive.Run()
@@ -66,7 +65,6 @@ func run(cmd *cobra.Command, args []string) error {
 		flagCategory = result.Category
 		flagOpen = result.OpenBrowser
 	} else {
-		// 1. Build case from --case file (if provided).
 		if flagCase != "" {
 			loaded, err := caseinfo.LoadFromFile(flagCase)
 			if err != nil {
@@ -75,7 +73,7 @@ func run(cmd *cobra.Command, args []string) error {
 			c = loaded
 		}
 
-		// 2. Build CLI overrides case.
+		// Build CLI overrides case.
 		cliCase := &caseinfo.Case{
 			Name:        flagName,
 			Location:    flagLocation,
@@ -84,21 +82,13 @@ func run(cmd *cobra.Command, args []string) error {
 			Description: flagDescription,
 		}
 		if flagAKA != "" {
-			for _, a := range strings.Split(flagAKA, ",") {
-				if trimmed := strings.TrimSpace(a); trimmed != "" {
-					cliCase.Aliases = append(cliCase.Aliases, trimmed)
-				}
-			}
+			cliCase.Aliases = caseinfo.SplitTrim(flagAKA)
 		}
 		if flagAssociates != "" {
-			for _, a := range strings.Split(flagAssociates, ",") {
-				if trimmed := strings.TrimSpace(a); trimmed != "" {
-					cliCase.Associates = append(cliCase.Associates, trimmed)
-				}
-			}
+			cliCase.Associates = caseinfo.SplitTrim(flagAssociates)
 		}
 
-		// 3. Merge: if case loaded from file, merge CLI overrides; otherwise use CLI case.
+		// Merge: if case loaded from file, merge CLI overrides; otherwise use CLI case.
 		if c != nil {
 			c.Merge(cliCase)
 		} else {
@@ -106,30 +96,26 @@ func run(cmd *cobra.Command, args []string) error {
 			c.FirstName, c.LastName = caseinfo.ParseName(c.Name)
 		}
 
-		// 4. Validate: name is required.
-		if c.Name == "" {
+		// Validate: name is required and must not be whitespace-only.
+		if strings.TrimSpace(c.Name) == "" {
 			return fmt.Errorf("name is required: use --name or --case")
 		}
 	}
 
-	// 5. Generate dorks.
 	allDorks := dork.Generate(c)
 
-	// 6. Parse filters.
-	categories := splitAndTrim(flagCategory)
-	regions := splitAndTrim(flagRegion)
+	categories := caseinfo.SplitTrim(flagCategory)
+	regions := caseinfo.SplitTrim(flagRegion)
 	engine := strings.ToLower(flagEngine)
 
-	// 7. Filter and sort.
 	filtered := dork.Filter(allDorks, categories, regions)
 	sorted := dork.Sort(filtered)
 
-	// 9. Dashboard mode: serve interactive web dashboard and block.
 	if flagDashboard {
 		return output.ServeDashboard(c, sorted, engine, web.DashboardHTML)
 	}
 
-	// 8. Output writer: default to os.Stdout; if --output is set, create file.
+	// Output writer: default to os.Stdout; if --output is set, create file.
 	var w io.Writer = os.Stdout
 	if flagOutput != "" {
 		f, err := os.Create(flagOutput)
@@ -140,12 +126,12 @@ func run(cmd *cobra.Command, args []string) error {
 		w = f
 	}
 
-	// 10. Tab blaster: if --open, open URLs in browser.
+	// Open URLs in browser if requested.
 	if flagOpen {
 		output.OpenInBrowser(sorted, engine, time.Duration(flagDelay)*time.Millisecond)
 	}
 
-	// 11. Export: switch on format.
+	// Export in requested format.
 	exportFormat := strings.ToLower(flagExport)
 	switch exportFormat {
 	case "discord":
@@ -175,17 +161,6 @@ func run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// splitAndTrim splits s on commas and trims whitespace from each element.
-func splitAndTrim(s string) []string {
-	var result []string
-	for _, part := range strings.Split(s, ",") {
-		if trimmed := strings.TrimSpace(part); trimmed != "" {
-			result = append(result, trimmed)
-		}
-	}
-	return result
-}
-
 func init() {
 	// Input flags
 	rootCmd.Flags().StringP("name", "n", "", `Full name as "First Last"`)
@@ -212,17 +187,22 @@ func init() {
 	// Other flags
 	rootCmd.Flags().BoolP("interactive", "i", false, "Interactive mode")
 
-	// Shell completions for enum flags
-	rootCmd.RegisterFlagCompletionFunc("engine", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"google", "bing", "duckduckgo", "yandex"}, cobra.ShellCompDirectiveNoFileComp
-	})
-	rootCmd.RegisterFlagCompletionFunc("region", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"global", "all", "us", "ca", "uk", "au", "ru", "fr", "de", "at", "nl"}, cobra.ShellCompDirectiveNoFileComp
-	})
-	rootCmd.RegisterFlagCompletionFunc("category", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"all", "social", "records", "financial", "location", "forums", "people-db"}, cobra.ShellCompDirectiveNoFileComp
-	})
-	rootCmd.RegisterFlagCompletionFunc("export", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"discord", "json", "csv", "clipboard"}, cobra.ShellCompDirectiveNoFileComp
-	})
+	// Shell completions for enum flags.
+	// Errors here indicate a programming mistake (wrong flag name), so we panic.
+	for _, reg := range []struct {
+		flag   string
+		values []string
+	}{
+		{"engine", []string{"google", "bing", "duckduckgo", "yandex"}},
+		{"region", []string{"global", "all", "us", "ca", "uk", "au", "ru", "fr", "de", "at", "nl"}},
+		{"category", []string{"all", "social", "records", "financial", "location", "forums", "people-db"}},
+		{"export", []string{"discord", "json", "csv", "clipboard"}},
+	} {
+		values := reg.values
+		if err := rootCmd.RegisterFlagCompletionFunc(reg.flag, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return values, cobra.ShellCompDirectiveNoFileComp
+		}); err != nil {
+			panic(fmt.Sprintf("registering completion for --%s: %v", reg.flag, err))
+		}
+	}
 }

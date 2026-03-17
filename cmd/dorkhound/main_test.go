@@ -62,6 +62,15 @@ func TestCLI_CaseFile(t *testing.T) {
 	}
 }
 
+func TestCLI_WhitespaceOnlyNameError(t *testing.T) {
+	cmd := exec.Command("go", "run", ".", "-n", "   ")
+	cmd.Dir = "."
+	err := cmd.Run()
+	if err == nil {
+		t.Error("should fail with whitespace-only --name")
+	}
+}
+
 func TestCLI_RegionFilter(t *testing.T) {
 	cmd := exec.Command("go", "run", ".", "-n", "John Doe", "--region", "us", "--export", "json")
 	cmd.Dir = "."

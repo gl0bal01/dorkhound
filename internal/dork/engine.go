@@ -13,8 +13,9 @@ type DorkGenerator func(c *caseinfo.Case) []Dork
 // definition files.
 var registry []DorkGenerator
 
-// Register appends a DorkGenerator to the global registry.
-func Register(fn DorkGenerator) {
+// register appends a DorkGenerator to the global registry.
+// Called only from init() functions within this package.
+func register(fn DorkGenerator) {
 	registry = append(registry, fn)
 }
 

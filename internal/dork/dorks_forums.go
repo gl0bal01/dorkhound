@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	Register(generateForumsDorks)
+	register(generateForumsDorks)
 }
 
 func generateForumsDorks(c *caseinfo.Case) []Dork {
@@ -48,7 +48,7 @@ func generateForumsDorks(c *caseinfo.Case) []Dork {
 	// Education .edu sites
 	dorks = append(dorks, Dork{
 		Query:    fmt.Sprintf(`"%s" site:edu`, name),
-		Category: "forums",
+		Category: "records",
 		Region:   "global",
 		Priority: 1,
 		Label:    "Education (.edu) mentions",
@@ -57,7 +57,7 @@ func generateForumsDorks(c *caseinfo.Case) []Dork {
 	// Resume/CV PDFs
 	dorks = append(dorks, Dork{
 		Query:    fmt.Sprintf(`"%s" filetype:pdf resume OR curriculum OR "CV"`, name),
-		Category: "forums",
+		Category: "records",
 		Region:   "global",
 		Priority: 1,
 		Label:    "Resume/CV PDFs",
@@ -66,7 +66,7 @@ func generateForumsDorks(c *caseinfo.Case) []Dork {
 	// Contact cards vcf/vcard
 	dorks = append(dorks, Dork{
 		Query:    fmt.Sprintf(`"%s" filetype:vcf OR "vcard" OR "contact card"`, name),
-		Category: "forums",
+		Category: "records",
 		Region:   "global",
 		Priority: 1,
 		Label:    "Contact cards (VCF/vCard)",

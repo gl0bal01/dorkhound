@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	Register(generateLocationDorks)
+	register(generateLocationDorks)
 }
 
 func generateLocationDorks(c *caseinfo.Case) []Dork {

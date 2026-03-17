@@ -79,6 +79,18 @@ func New(name string) *Case {
 	return c
 }
 
+// SplitTrim splits a comma-separated string and trims whitespace from each part,
+// discarding empty elements.
+func SplitTrim(s string) []string {
+	var result []string
+	for _, part := range strings.Split(s, ",") {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
 // Merge applies non-zero/non-empty override values from overrides onto the
 // receiver Case. If Name is overridden, FirstName and LastName are re-parsed.
 func (c *Case) Merge(overrides *Case) {

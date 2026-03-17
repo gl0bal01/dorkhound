@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gl0bal01/dorkhound/internal/caseinfo"
 	"github.com/gl0bal01/dorkhound/internal/dork"
@@ -29,6 +30,7 @@ type dashboardResult struct {
 	Label    string `json:"label"`
 	URL      string `json:"url"`
 	Category string `json:"category"`
+	Region   string `json:"region"`
 	Priority int    `json:"priority"`
 }
 
@@ -41,6 +43,7 @@ func ServeDashboard(c *caseinfo.Case, dorks []dork.Dork, engine string, htmlTemp
 			Label:    d.Label,
 			URL:      d.URL(engine),
 			Category: d.Category,
+			Region:   d.Region,
 			Priority: d.Priority,
 		}
 	}
@@ -72,9 +75,20 @@ func ServeDashboard(c *caseinfo.Case, dorks []dork.Dork, engine string, htmlTemp
 	addr := listener.Addr().(*net.TCPAddr)
 	url := fmt.Sprintf("http://127.0.0.1:%d", addr.Port)
 
-	// Register handler.
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	// Use a dedicated mux instead of http.DefaultServeMux to avoid
+	// route pollution from imported packages.
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Only serve the exact root path.
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Cache-Control", "no-store")
 		fmt.Fprint(w, html)
 	})
 
@@ -83,6 +97,13 @@ func ServeDashboard(c *caseinfo.Case, dorks []dork.Dork, engine string, htmlTemp
 	// Open in browser (best-effort).
 	_ = openURL(url)
 
-	// Serve until interrupted.
-	return http.Serve(listener, nil)
+	// Serve until interrupted, with timeouts to prevent slowloris.
+	srv := &http.Server{
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	return srv.Serve(listener)
 }

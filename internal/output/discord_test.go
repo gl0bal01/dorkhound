@@ -98,8 +98,8 @@ func TestDiscordFormat(t *testing.T) {
 	if !strings.Contains(out, "(2 links)") {
 		t.Errorf("missing '(2 links)' count for social section; got:\n%s", out)
 	}
-	if !strings.Contains(out, "(1 links)") {
-		t.Errorf("missing '(1 links)' count for records section; got:\n%s", out)
+	if !strings.Contains(out, "(1 link)") {
+		t.Errorf("missing '(1 link)' count for records section; got:\n%s", out)
 	}
 }
 

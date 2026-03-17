@@ -1,6 +1,21 @@
 # dorkhound — OSINT Missing Person Finder
 
-Fast Google dork URL generator for TraceLab CTF competitions. Single binary, zero dependencies, cross-platform.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/gl0bal01/dorkhound)](https://go.dev/)
+[![CI](https://github.com/gl0bal01/dorkhound/actions/workflows/ci.yml/badge.svg)](https://github.com/gl0bal01/dorkhound/actions/workflows/ci.yml)
+[![OSINT Tool](https://img.shields.io/badge/OSINT-Tool-blue)](https://github.com/gl0bal01/dorkhound)
+[![TraceLab CTF](https://img.shields.io/badge/TraceLab-CTF-red)](https://www.tracelabs.org/)
+[![Google Dorks](https://img.shields.io/badge/Google-Dorks-green)](https://github.com/gl0bal01/dorkhound)
+[![Go Report Card](https://goreportcard.com/badge/github.com/gl0bal01/dorkhound)](https://goreportcard.com/report/github.com/gl0bal01/dorkhound)
+[![Go Reference](https://pkg.go.dev/badge/github.com/gl0bal01/dorkhound.svg)](https://pkg.go.dev/github.com/gl0bal01/dorkhound)
+
+Fast Google dork URL generator for finding missing persons and TraceLab CTF competitions. Single binary, zero dependencies, cross-platform.
+
+> **Responsible use:** This tool is intended for authorized OSINT investigations, CTF competitions, and educational use only. Always comply with applicable laws and platform terms of service.
+
+## Requirements
+
+- Go 1.25+ (for building from source)
 
 ## Install
 
@@ -54,12 +69,12 @@ dorkhound -i
 | `--case` | | Path to YAML/JSON case file |
 
 ### Output
-| Flag | Description |
-|------|-------------|
-| `--open` | Open all URLs in default browser |
-| `--dashboard` | Serve local web dashboard |
-| `--export` | Format: `discord`, `json`, `csv`, `clipboard` |
-| `--output` | Write to file instead of stdout |
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--open` | | Open all URLs in default browser |
+| `--dashboard` | | Serve local web dashboard |
+| `--export` | | Format: `discord`, `json`, `csv`, `clipboard` |
+| `--output` | `-o` | Write to file instead of stdout |
 
 ### Filters
 | Flag | Default | Description |
@@ -98,6 +113,51 @@ engine: "google"
 | `at` | Herold.at, DasTelefonbuch.at |
 | `nl` | DeTelefoongids, WhitePages.nl, Numberway.nl |
 
+## Export Formats
+
+### CSV
+
+Columns: `label`, `category`, `region`, `priority`, `query`, `url`
+
+```bash
+dorkhound -n "John Doe" --region us --export csv -o results.csv
+```
+
+### JSON
+
+Includes full case metadata and results with region info. Empty fields are omitted.
+
+```bash
+dorkhound -n "John Doe" --export json -o results.json
+```
+
+### Discord
+
+Markdown-formatted output grouped by category, ready to paste into Discord.
+
+```bash
+dorkhound -n "John Doe" --export discord
+```
+
+### Clipboard
+
+Same as Discord format, copied directly to system clipboard.
+
+```bash
+dorkhound -n "John Doe" --export clipboard
+```
+
+## Categories
+
+| Category | Description |
+|----------|-------------|
+| `social` | Facebook, LinkedIn, Instagram, Twitter/X, TikTok, YouTube, GitHub, etc. |
+| `records` | Court records, property, obituaries, education, resumes, contact cards |
+| `financial` | PayPal, Venmo, bank/loan mentions, contact spreadsheets |
+| `location` | Google Maps reviews, travel/booking, relocation mentions |
+| `forums` | Reddit, Quora, forum profiles, associate cross-references |
+| `people-db` | Direct lookups on Spokeo, Whitepages, TruePeopleSearch, etc. |
+
 ## Shell Completions
 
 ```bash
@@ -114,3 +174,5 @@ dorkhound completion fish | source
 ## License
 
 MIT
+
+[Releases]: https://github.com/gl0bal01/dorkhound/releases

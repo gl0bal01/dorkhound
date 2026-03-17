@@ -11,9 +11,9 @@ import (
 // jsonCase is the JSON-serializable representation of case metadata.
 type jsonCase struct {
 	Name     string `json:"name"`
-	Location string `json:"location"`
-	Age      int    `json:"age"`
-	DOB      string `json:"dob"`
+	Location string `json:"location,omitempty"`
+	Age      int    `json:"age,omitempty"`
+	DOB      string `json:"dob,omitempty"`
 }
 
 // jsonResult is the JSON-serializable representation of a single dork result.
@@ -21,6 +21,7 @@ type jsonResult struct {
 	Label    string `json:"label"`
 	URL      string `json:"url"`
 	Category string `json:"category"`
+	Region   string `json:"region,omitempty"`
 	Priority int    `json:"priority"`
 }
 
@@ -38,6 +39,7 @@ func JSON(w io.Writer, c *caseinfo.Case, dorks []dork.Dork, engine string) error
 			Label:    d.Label,
 			URL:      d.URL(engine),
 			Category: d.Category,
+			Region:   d.Region,
 			Priority: d.Priority,
 		}
 	}

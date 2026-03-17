@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	Register(generateRecordsDorks)
+	register(generateRecordsDorks)
 }
 
 func generateRecordsDorks(c *caseinfo.Case) []Dork {

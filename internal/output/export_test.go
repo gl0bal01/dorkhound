@@ -161,7 +161,7 @@ func TestCSVFormat(t *testing.T) {
 		t.Fatal("CSV output has no rows")
 	}
 	header := records[0]
-	expectedHeader := []string{"label", "category", "priority", "url"}
+	expectedHeader := []string{"label", "category", "region", "priority", "query", "url"}
 	if len(header) != len(expectedHeader) {
 		t.Fatalf("header has %d columns, want %d", len(header), len(expectedHeader))
 	}
@@ -184,10 +184,13 @@ func TestCSVFormat(t *testing.T) {
 	if row1[1] != "social" {
 		t.Errorf("row1 category = %q, want %q", row1[1], "social")
 	}
-	if row1[2] != "2" {
-		t.Errorf("row1 priority = %q, want %q", row1[2], "2")
+	if row1[2] != "global" {
+		t.Errorf("row1 region = %q, want %q", row1[2], "global")
 	}
-	if !strings.Contains(row1[3], "google.com/search") {
-		t.Errorf("row1 url missing google.com/search; got %q", row1[3])
+	if row1[3] != "2" {
+		t.Errorf("row1 priority = %q, want %q", row1[3], "2")
+	}
+	if !strings.Contains(row1[5], "google.com/search") {
+		t.Errorf("row1 url missing google.com/search; got %q", row1[5])
 	}
 }

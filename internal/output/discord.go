@@ -63,7 +63,11 @@ func Discord(w io.Writer, c *caseinfo.Case, dorks []dork.Dork, engine string) {
 		if title == "" {
 			title = cat
 		}
-		fmt.Fprintf(w, "\n### %s (%d links)\n", title, len(ds))
+		noun := "links"
+		if len(ds) == 1 {
+			noun = "link"
+		}
+		fmt.Fprintf(w, "\n### %s (%d %s)\n", title, len(ds), noun)
 		for _, d := range ds {
 			fmt.Fprintf(w, "- %s: %s\n", d.Label, d.URL(engine))
 		}

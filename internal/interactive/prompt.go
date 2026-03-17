@@ -2,6 +2,7 @@ package interactive
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/huh"
@@ -28,7 +29,13 @@ func Run() (*Result, error) {
 	// Step 1: Required info
 	err := huh.NewForm(
 		huh.NewGroup(
-			huh.NewInput().Title("Person's full name").Value(&name),
+			huh.NewInput().Title("Person's full name").
+				Validate(func(s string) error {
+					if strings.TrimSpace(s) == "" {
+						return fmt.Errorf("name is required")
+					}
+					return nil
+				}).Value(&name),
 			huh.NewInput().Title("Last known location (optional)").Value(&location),
 			huh.NewInput().Title("Date of birth (optional, YYYY-MM-DD)").Value(&dob),
 			huh.NewInput().Title("Approximate age (optional)").Value(&age),
@@ -97,14 +104,17 @@ func Run() (*Result, error) {
 	c.DOB = dob
 	c.Description = description
 	if aka != "" {
-		c.Aliases = splitTrim(aka)
+		c.Aliases = caseinfo.SplitTrim(aka)
 	}
 	if associates != "" {
-		c.Associates = splitTrim(associates)
+		c.Associates = caseinfo.SplitTrim(associates)
 	}
-	// Parse age
 	if age != "" {
-		fmt.Sscanf(age, "%d", &c.Age)
+		parsed, err := strconv.Atoi(strings.TrimSpace(age))
+		if err != nil {
+			return nil, fmt.Errorf("invalid age %q: must be a number", age)
+		}
+		c.Age = parsed
 	}
 
 	regionStr := "global"
@@ -119,16 +129,4 @@ func Run() (*Result, error) {
 		Category:    category,
 		OpenBrowser: openBrowser,
 	}, nil
-}
-
-// splitTrim splits a comma-separated string and trims whitespace from each part.
-func splitTrim(s string) []string {
-	parts := strings.Split(s, ",")
-	var result []string
-	for _, p := range parts {
-		if p = strings.TrimSpace(p); p != "" {
-			result = append(result, p)
-		}
-	}
-	return result
 }

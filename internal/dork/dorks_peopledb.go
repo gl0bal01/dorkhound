@@ -2,13 +2,14 @@ package dork
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/gl0bal01/dorkhound/internal/caseinfo"
 )
 
 func init() {
-	Register(generatePeopleDBDorks)
+	register(generatePeopleDBDorks)
 }
 
 func generatePeopleDBDorks(c *caseinfo.Case) []Dork {
@@ -24,19 +25,21 @@ func generatePeopleDBDorks(c *caseinfo.Case) []Dork {
 
 	// For single-name people (no first name), use last name only in URL slugs.
 	// Helper to build hyphenated slug: "first-last" or just "last".
+	// Path components are escaped to prevent URL corruption from special characters.
 	slug := func(sep string) string {
 		if first == "" {
-			return last
+			return url.PathEscape(last)
 		}
-		return first + sep + last
+		return url.PathEscape(first) + sep + url.PathEscape(last)
 	}
 
 	// Helper for "first+last" or just "last" (query params).
+	// Values are URL-encoded for safe use in query strings.
 	plusName := func() string {
 		if first == "" {
-			return last
+			return url.QueryEscape(last)
 		}
-		return first + "+" + last
+		return url.QueryEscape(first) + "+" + url.QueryEscape(last)
 	}
 
 	// Original-case helpers for site: search queries
