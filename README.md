@@ -1,4 +1,4 @@
-# dorkhound — OSINT Missing Person Finder
+# dorkhound — OSINT Google Dork URL Generator
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/gl0bal01/dorkhound)](https://go.dev/)
@@ -9,7 +9,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/gl0bal01/dorkhound)](https://goreportcard.com/report/github.com/gl0bal01/dorkhound)
 [![Go Reference](https://pkg.go.dev/badge/github.com/gl0bal01/dorkhound.svg)](https://pkg.go.dev/github.com/gl0bal01/dorkhound)
 
-Fast Google dork URL generator for finding missing persons and TraceLab CTF competitions. Single binary, zero dependencies, cross-platform.
+Google dork URL generator for missing person investigations and TraceLab CTF competitions. Generates search query URLs using advanced Google operators — the user reviews results and determines relevance. Single binary, zero runtime dependencies, cross-platform.
 
 > **Responsible use:** This tool is intended for authorized OSINT investigations, CTF competitions, and educational use only. Always comply with applicable laws and platform terms of service.
 
