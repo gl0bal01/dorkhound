@@ -20,7 +20,7 @@ func generateForumsDorks(c *caseinfo.Case) []Dork {
 
 	// Reddit
 	dorks = append(dorks, Dork{
-		Query:    fmt.Sprintf(`"%s" site:reddit.com`, name),
+		Query:    fmt.Sprintf(`"%s" site:reddit.com OR site:old.reddit.com`, name),
 		Category: "forums",
 		Region:   "global",
 		Priority: 1,

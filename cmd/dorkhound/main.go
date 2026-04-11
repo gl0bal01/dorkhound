@@ -247,7 +247,48 @@ func run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+var completionCmd = &cobra.Command{
+	Use:   "completion [bash|zsh|fish|powershell]",
+	Short: "Generate shell completion script",
+	Long: `Generate a shell completion script for dorkhound.
+
+Examples:
+
+  # Bash (current session)
+  source <(dorkhound completion bash)
+
+  # Bash (persist)
+  dorkhound completion bash > /etc/bash_completion.d/dorkhound
+
+  # Zsh
+  dorkhound completion zsh > "${fpath[1]}/_dorkhound"
+
+  # Fish
+  dorkhound completion fish > ~/.config/fish/completions/dorkhound.fish
+
+  # PowerShell
+  dorkhound completion powershell > dorkhound.ps1`,
+	DisableFlagsInUseLine: true,
+	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
+	Args:                  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		switch args[0] {
+		case "bash":
+			return rootCmd.GenBashCompletion(os.Stdout)
+		case "zsh":
+			return rootCmd.GenZshCompletion(os.Stdout)
+		case "fish":
+			return rootCmd.GenFishCompletion(os.Stdout, true)
+		case "powershell":
+			return rootCmd.GenPowerShellCompletionWithDesc(os.Stdout)
+		}
+		return nil
+	},
+}
+
 func init() {
+	rootCmd.AddCommand(completionCmd)
+
 	// Input flags
 	rootCmd.Flags().StringP("name", "n", "", `Full name as "First Last"`)
 	rootCmd.Flags().StringP("location", "l", "", "Last known location")
@@ -309,7 +350,8 @@ func init() {
 		{"region", []string{"global", "all", "us", "ca", "uk", "au", "ru", "fr", "de", "at", "nl"}},
 		{"category", []string{"all", "social", "records", "financial", "location", "forums", "people-db",
 			"email", "phone", "username", "cache", "documents", "dating", "marketplace",
-			"nuclei", "image", "gravatar", "github", "academic", "direct-profile"}},
+			"nuclei", "image", "gravatar", "github", "academic", "direct-profile",
+			"twitter", "reddit", "fundraiser", "telegram", "vehicle", "crypto"}},
 		{"export", []string{"discord", "json", "csv", "clipboard", "tracelabs"}},
 	} {
 		values := reg.values

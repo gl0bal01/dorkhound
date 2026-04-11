@@ -26,7 +26,7 @@ func generateSocialDorks(c *caseinfo.Case) []Dork {
 		{"facebook.com", "Facebook"},
 		{"linkedin.com", "LinkedIn"},
 		{"instagram.com", "Instagram"},
-		{"twitter.com", "Twitter/X"},
+		{"twitter.com OR site:x.com", "Twitter/X"},
 		{"tiktok.com", "TikTok"},
 		{"youtube.com", "YouTube"},
 		{"github.com", "GitHub"},
@@ -37,6 +37,9 @@ func generateSocialDorks(c *caseinfo.Case) []Dork {
 		{"bsky.app", "Bluesky"},
 		{"mastodon.social", "Mastodon"},
 		{"t.me", "Telegram"},
+		{"substack.com", "Substack"},
+		{"news.ycombinator.com", "Hacker News"},
+		{"lobste.rs", "Lobsters"},
 	}
 
 	for _, s := range globalSites {
@@ -84,7 +87,7 @@ func generateSocialDorks(c *caseinfo.Case) []Dork {
 	})
 
 	// Alias searches on major social platforms
-	majorSites := []string{"facebook.com", "linkedin.com", "instagram.com", "twitter.com", "tiktok.com"}
+	majorSites := []string{"facebook.com", "linkedin.com", "instagram.com", "twitter.com OR site:x.com", "tiktok.com"}
 	for _, alias := range c.Aliases {
 		for _, site := range majorSites {
 			q := fmt.Sprintf(`"%s" OR "%s" site:%s`, name, alias, site)
@@ -161,6 +164,24 @@ func generateSocialDorks(c *caseinfo.Case) []Dork {
 		Priority: 2,
 		Label:    "Hyves archive search",
 	})
+
+	// Chan-style / harassment tracking sites (low priority)
+	dorks = append(dorks,
+		Dork{
+			Query:    fmt.Sprintf(`"%s" site:kiwifarms.net`, name),
+			Category: "social",
+			Region:   "global",
+			Priority: 1,
+			Label:    "Kiwifarms mentions",
+		},
+		Dork{
+			Query:    fmt.Sprintf(`"%s" site:4chan.org OR site:archive.4plebs.org`, name),
+			Category: "social",
+			Region:   "global",
+			Priority: 1,
+			Label:    "4chan/archive mentions",
+		},
+	)
 
 	return dorks
 }

@@ -16,15 +16,15 @@ func generateUsernameDorks(c *caseinfo.Case) []Dork {
 	}
 
 	highPrioritySites := map[string]bool{
-		"github.com":         true,
-		"gitlab.com":         true,
-		"reddit.com":         true,
-		"twitter.com":        true,
-		"instagram.com":      true,
-		"tiktok.com":         true,
-		"youtube.com":        true,
-		"steamcommunity.com": true,
-		"keybase.io":         true,
+		"github.com":              true,
+		"gitlab.com":              true,
+		"reddit.com":              true,
+		"twitter.com OR site:x.com": true,
+		"instagram.com":           true,
+		"tiktok.com":              true,
+		"youtube.com":             true,
+		"steamcommunity.com":      true,
+		"keybase.io":              true,
 	}
 
 	sites := []struct {
@@ -33,8 +33,8 @@ func generateUsernameDorks(c *caseinfo.Case) []Dork {
 	}{
 		{"github.com", "GitHub"},
 		{"gitlab.com", "GitLab"},
-		{"reddit.com", "Reddit"},
-		{"twitter.com", "Twitter/X"},
+		{"reddit.com OR site:old.reddit.com", "Reddit"},
+		{"twitter.com OR site:x.com", "Twitter/X"},
 		{"instagram.com", "Instagram"},
 		{"tiktok.com", "TikTok"},
 		{"youtube.com", "YouTube"},

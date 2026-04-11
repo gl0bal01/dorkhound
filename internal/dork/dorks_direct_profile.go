@@ -29,6 +29,7 @@ func generateDirectProfileDorks(c *caseinfo.Case) []Dork {
 		{"Instagram", "https://www.instagram.com/%s/"},
 		{"TikTok", "https://www.tiktok.com/@%s"},
 		{"Reddit", "https://www.reddit.com/user/%s"},
+		{"Reddit (old)", "https://old.reddit.com/user/%s"},
 		{"YouTube", "https://www.youtube.com/@%s"},
 		{"Medium", "https://medium.com/@%s"},
 		{"Dev.to", "https://dev.to/%s"},

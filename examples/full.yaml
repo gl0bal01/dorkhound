@@ -1,0 +1,42 @@
+# Full reference case — every field populated with placeholder data.
+# Copy this file, replace values, and run:
+#   dorkhound --case examples/full.yaml --dashboard
+#
+# Fields marked OPTIONAL can be omitted if unknown; dorkhound skips them silently.
+
+# ── Identity ──────────────────────────────────────────────────────────────────
+name: "Jane Doe"                    # Required. Full name as "First Last".
+aliases: ["JD", "Janey", "J.Doe"]  # OPTIONAL. Nicknames or former names.
+dob: "1990-05-15"                   # OPTIONAL. Date of birth (YYYY-MM-DD).
+age: 35                             # OPTIONAL. Approximate age (integer).
+
+# ── Location & description ────────────────────────────────────────────────────
+location: "Brooklyn, NY"            # OPTIONAL. Last known city/state/country.
+description: "5'6\", brown hair, last seen 2024-11-03"  # OPTIONAL. Physical description or context notes.
+
+# ── Social graph ──────────────────────────────────────────────────────────────
+associates:                         # OPTIONAL. Known associates — dorkhound cross-references these in dorks.
+  - "John Smith"
+  - "Bob Brown"
+
+# ── Contact identifiers ───────────────────────────────────────────────────────
+# Each identifier expands the dork corpus significantly. Add as many as known.
+emails:
+  - "jane.doe@example.com"
+  - "jdoe@workmail.com"
+phones:
+  - "+1-555-123-4567"
+  - "5551234567"
+usernames:
+  - "jdoe42"
+  - "jane_doe_92"
+  - "janey"
+
+# ── Photo ─────────────────────────────────────────────────────────────────────
+photo_url: "https://example.com/jane.jpg"       # OPTIONAL. Public URL — enables reverse-image-search dorks.
+photo_path: "/home/operator/cases/jane/photo1.jpg"  # OPTIONAL. Local path for operator notes (not uploaded).
+
+# ── Dork generation settings ──────────────────────────────────────────────────
+region: us          # Region filter. Use --list-regions for choices.
+categories: [all]   # Category filter. Use --list-categories for choices.
+engine: google      # Search engine: google, bing, duckduckgo, yandex.

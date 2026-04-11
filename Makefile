@@ -31,3 +31,22 @@ lint:
 
 fmt:
 	gofmt -w .
+
+completion-install: build
+	@shell=$$(basename "$$SHELL"); \
+	case "$$shell" in \
+	  bash) ./$(BINARY) completion bash > /etc/bash_completion.d/$(BINARY) && echo "bash completion installed to /etc/bash_completion.d/$(BINARY)";; \
+	  zsh)  ./$(BINARY) completion zsh > "$${fpath[1]}/_$(BINARY)" && echo "zsh completion installed";; \
+	  fish) ./$(BINARY) completion fish > ~/.config/fish/completions/$(BINARY).fish && echo "fish completion installed";; \
+	  *)    echo "Unsupported shell: $$shell. Run: dorkhound completion <bash|zsh|fish|powershell>";; \
+	esac
+
+release-local:
+	mkdir -p dist
+	GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build -trimpath $(LDFLAGS) -o dist/$(BINARY)-linux-amd64   ./cmd/dorkhound
+	GOOS=linux   GOARCH=arm64 CGO_ENABLED=0 go build -trimpath $(LDFLAGS) -o dist/$(BINARY)-linux-arm64   ./cmd/dorkhound
+	GOOS=darwin  GOARCH=amd64 CGO_ENABLED=0 go build -trimpath $(LDFLAGS) -o dist/$(BINARY)-darwin-amd64  ./cmd/dorkhound
+	GOOS=darwin  GOARCH=arm64 CGO_ENABLED=0 go build -trimpath $(LDFLAGS) -o dist/$(BINARY)-darwin-arm64  ./cmd/dorkhound
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath $(LDFLAGS) -o dist/$(BINARY)-windows-amd64.exe ./cmd/dorkhound
+	cd dist && for f in *; do tar czf "$$f.tar.gz" "$$f" && rm "$$f"; done
+	@echo "Local release artifacts in dist/"

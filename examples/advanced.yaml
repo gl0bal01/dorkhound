@@ -1,0 +1,11 @@
+# Advanced case: targeted dork generation with filtered categories and region.
+# Useful when you already have a strong lead (e.g. a known username + email)
+# and want to focus on high-signal sources only.
+name: "Maria Garcia"
+aliases: ["mgarcia", "maria_g_87"]
+emails: ["maria.garcia@example.com"]
+usernames: ["mgarcia87", "maria_g"]
+photo_url: "https://example.com/maria.jpg"
+region: us
+categories: [username, direct-profile, github, email, image, gravatar]
+engine: google

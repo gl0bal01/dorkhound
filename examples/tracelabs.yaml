@@ -1,0 +1,18 @@
+# TraceLabs CTF starting template.
+# The organizers usually give you: name, approx age, last-known location, photo URL.
+# Drop those here and run:
+#   dorkhound --case examples/tracelabs.yaml --dashboard
+# Pivot: as you find new handles/emails, add them to this file and re-run.
+name: "TARGET_NAME"
+age: 0
+location: "LAST_KNOWN_LOCATION"
+photo_url: "PHOTO_URL"
+
+# Fill these in as you discover them mid-investigation:
+emails: []
+usernames: []
+phones: []
+aliases: []
+
+region: global
+engine: google

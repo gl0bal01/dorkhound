@@ -72,5 +72,33 @@ func generateDocumentDorks(c *caseinfo.Case) []Dork {
 			Priority: 1,
 			Label:    "Alternative document platforms",
 		},
+		{
+			Query:    fmt.Sprintf(`"%s" site:coursehero.com OR site:studocu.com OR site:chegg.com`, name),
+			Category: "documents",
+			Region:   "global",
+			Priority: 1,
+			Label:    "Student document platforms",
+		},
+		{
+			Query:    fmt.Sprintf(`"%s" site:zenodo.org OR site:figshare.com`, name),
+			Category: "documents",
+			Region:   "global",
+			Priority: 1,
+			Label:    "Academic datasets (Zenodo, Figshare)",
+		},
+		{
+			Query:    fmt.Sprintf(`"%s" "syllabus" filetype:pdf`, name),
+			Category: "documents",
+			Region:   "global",
+			Priority: 1,
+			Label:    "Syllabus PDFs",
+		},
+		{
+			Query:    fmt.Sprintf(`"%s" "application form" OR "registration form" filetype:pdf`, name),
+			Category: "documents",
+			Region:   "global",
+			Priority: 2,
+			Label:    "Application/registration form PDFs",
+		},
 	}
 }

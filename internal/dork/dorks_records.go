@@ -119,5 +119,51 @@ func generateRecordsDorks(c *caseinfo.Case) []Dork {
 		Label:    "VINELink victim notification",
 	})
 
+	// US missing-person registries
+	dorks = append(dorks,
+		Dork{
+			Query:    narrow(fmt.Sprintf(`"%s" site:namus.gov`, name)),
+			Category: "records",
+			Region:   "us",
+			Priority: 3,
+			Label:    "NamUs (US DoJ missing-person registry)",
+		},
+		Dork{
+			Query:    narrow(fmt.Sprintf(`"%s" site:charleyproject.org`, name)),
+			Category: "records",
+			Region:   "us",
+			Priority: 3,
+			Label:    "Charley Project (US cold cases)",
+		},
+		Dork{
+			Query:    narrow(fmt.Sprintf(`"%s" site:doenetwork.org`, name)),
+			Category: "records",
+			Region:   "global",
+			Priority: 2,
+			Label:    "Doe Network (international missing persons)",
+		},
+		Dork{
+			Query:    narrow(fmt.Sprintf(`"%s" site:missingkids.org`, name)),
+			Category: "records",
+			Region:   "us",
+			Priority: 3,
+			Label:    "NCMEC MissingKids",
+		},
+		Dork{
+			Query:    narrow(fmt.Sprintf(`"%s" site:missingpeople.org.uk`, name)),
+			Category: "records",
+			Region:   "uk",
+			Priority: 3,
+			Label:    "Missing People UK",
+		},
+		Dork{
+			Query:    narrow(fmt.Sprintf(`"%s" site:interpol.int inurl:Notices`, name)),
+			Category: "records",
+			Region:   "global",
+			Priority: 2,
+			Label:    "Interpol public notices",
+		},
+	)
+
 	return dorks
 }
