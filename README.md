@@ -1,4 +1,4 @@
-# dorkhound — OSINT Google Dork URL Generator
+# dorkhound — OSINT Investigation Toolkit for TraceLabs CTFs
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/gl0bal01/dorkhound)](https://go.dev/)
@@ -9,7 +9,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/gl0bal01/dorkhound)](https://goreportcard.com/report/github.com/gl0bal01/dorkhound)
 [![Go Reference](https://pkg.go.dev/badge/github.com/gl0bal01/dorkhound.svg)](https://pkg.go.dev/github.com/gl0bal01/dorkhound)
 
-dorkhound generates 200+ OSINT dork queries and direct-profile URLs across 22 categories to accelerate missing-person investigations and TraceLabs CTF competitions. You provide a name (and optionally emails, usernames, a photo, or a full case file); dorkhound produces a ranked list of search URLs you open and triage. Single binary, zero runtime dependencies, cross-platform.
+dorkhound generates 340+ OSINT dork queries, direct-profile URLs, and reverse-image-search links across 25 categories to accelerate missing-person investigations and TraceLabs CTF competitions. You provide a name (and optionally emails, phones, usernames, a photo, or a full case file); dorkhound produces a ranked list of search URLs and direct endpoints you open and triage in an interactive dashboard. Single binary, zero runtime dependencies, cross-platform.
 
 > **Responsible use:** This tool is intended for authorized OSINT investigations, CTF competitions, and educational use only. Always comply with applicable laws and platform terms of service.
 
@@ -58,16 +58,22 @@ The dashboard's "Open batch" button opens URLs in rate-limited groups to avoid s
 
 ## Features
 
-- 200+ dorks across 22 categories: social, records, financial, location, forums, people-db, email, phone, username, cache, documents, dating, marketplace, image, gravatar, github, academic, direct-profile, twitter, reddit, fundraiser, telegram, vehicle, crypto, nuclei
-- Direct-URL dorks for 20+ platforms including Telegram, Keybase, Twitter/X, Mastodon, Bluesky, GitHub, Gravatar, and others — no search engine required
-- Reverse image search across Google Lens, Yandex, TinEye, Bing Visual Search, PimEyes, SauceNAO, IQDB, and KarmaDecay — pass `--photo-url` to activate
+- 340+ dorks across 25 categories: social, records, financial, location, forums, people-db, email, phone, username, cache, documents, dating, marketplace, image, gravatar, github, academic, direct-profile, twitter, reddit, fundraiser, telegram, vehicle, crypto, nuclei
+- Twitter/X audit: every Twitter dork emits `site:twitter.com OR site:x.com` plus nitter mirrors, Wayback Machine captures of both domains, the X syndication endpoint, and X advanced-search URLs for login-less reconnaissance
+- Reddit audit: `old.reddit.com` alongside `reddit.com`, RSS feeds, `about.json` profile endpoints, and third-party search indexers
+- Direct-URL dorks for 20+ platforms (Telegram, Keybase, Twitter/X, Mastodon, Bluesky, GitHub, Reddit old/new, Steam, Twitch, Last.fm, SoundCloud, Medium, Dev.to, Dribbble, Flickr, About.me, Linktree, and more) — no search engine required
+- Reverse image search across Google Lens, Yandex (best for faces), TinEye, Bing Visual Search, PimEyes, SauceNAO, IQDB, KarmaDecay — pass `--photo-url` to activate
+- GitHub OSINT: commits-by-email search, `.keys` / `.gpg` leak probes, public-events API, gists
+- Gravatar lookups: MD5-hashed email → avatar, profile JSON, profile page
+- Missing-person registries: NamUs, CharleyProject, DoeNetwork, NCMEC (US), MissingPeople (UK), Interpol notices
 - Nuclei v2 integration: username enumeration across 600+ sites via `-tags osint`
-- Preflight HTTP checker: probes direct-URL dorks with HEAD requests and drops dead links before operator triage
-- Interactive dashboard with localStorage state persistence, per-result notes and evidence fields, filter bar, rate-limited "Open batch", and keyboard shortcuts
+- Preflight HTTP checker: HEAD-probes direct-URL dorks and drops dead links before operator triage
+- Interactive dashboard with localStorage state persistence, per-result notes and evidence fields, filter bar, rate-limited "Open batch", keyboard shortcuts
 - TraceLabs submission format export
 - Export formats: discord, json, csv, clipboard, tracelabs
 - Region filters for US, CA, UK, AU, RU, FR, DE, AT, NL
 - Interactive guided-prompt mode (`-i`)
+- Dork deduplication: collisions across generators are collapsed, highest-priority wins
 
 ## Flags
 
@@ -76,15 +82,24 @@ Run `dorkhound --help` for the full flag reference. The most commonly used flags
 | Flag | Description |
 |------|-------------|
 | `--name` / `-n` | Full name ("First Last") |
-| `--case` | Path to YAML case file |
-| `--dashboard` | Serve local web dashboard |
+| `--case` | Path to YAML or JSON case file |
+| `--emails` | Email addresses, comma-separated |
+| `--phones` | Phone numbers, comma-separated |
+| `--usernames` | Usernames/handles, comma-separated |
+| `--photo-url` | Photo URL for reverse image search |
+| `--location` / `-l` | Last known location |
+| `--dashboard` | Serve local web dashboard with notes & filters |
 | `--export` | Output format: discord, json, csv, clipboard, tracelabs |
-| `--category` | Category filter (default: all) |
-| `--region` | Region filter (default: global) |
+| `--category` | Category filter (see `--list-categories`) |
+| `--region` | Region filter (see `--list-regions`) |
 | `--open` | Open all URLs in default browser |
+| `--batch` / `--batch-pause` | Rate-limited batch opening (default 10 per 30s to avoid CAPTCHAs) |
+| `--delay` | Delay between tabs when `--open` is set (default 2000ms) |
+| `--noise-filter` | Append noise-suppression operators (`-site:pinterest.com` etc.) |
 | `--preflight` | Drop dead direct-URL dorks before output |
 | `--nuclei` | Run nuclei OSINT templates against usernames |
 | `--stats` | Print dork count breakdown and exit |
+| `-i` / `--interactive` | Guided prompt mode |
 
 ## Dashboard Keyboard Shortcuts
 
