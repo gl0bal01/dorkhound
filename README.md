@@ -9,7 +9,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/gl0bal01/dorkhound)](https://goreportcard.com/report/github.com/gl0bal01/dorkhound)
 [![Go Reference](https://pkg.go.dev/badge/github.com/gl0bal01/dorkhound.svg)](https://pkg.go.dev/github.com/gl0bal01/dorkhound)
 
-dorkhound generates 150+ OSINT dork queries and direct-profile URLs across 20 categories to accelerate missing-person investigations and TraceLabs CTF competitions. You provide a name (and optionally emails, usernames, a photo, or a full case file); dorkhound produces a ranked list of search URLs you open and triage. Single binary, zero runtime dependencies, cross-platform.
+dorkhound generates 200+ OSINT dork queries and direct-profile URLs across 22 categories to accelerate missing-person investigations and TraceLabs CTF competitions. You provide a name (and optionally emails, usernames, a photo, or a full case file); dorkhound produces a ranked list of search URLs you open and triage. Single binary, zero runtime dependencies, cross-platform.
 
 > **Responsible use:** This tool is intended for authorized OSINT investigations, CTF competitions, and educational use only. Always comply with applicable laws and platform terms of service.
 
@@ -58,7 +58,7 @@ The dashboard's "Open batch" button opens URLs in rate-limited groups to avoid s
 
 ## Features
 
-- 150+ dorks across 20 categories: social, records, financial, location, forums, people-db, email, phone, username, cache, documents, dating, marketplace, image, gravatar, github, academic, direct-profile, nuclei, and more
+- 200+ dorks across 22 categories: social, records, financial, location, forums, people-db, email, phone, username, cache, documents, dating, marketplace, image, gravatar, github, academic, direct-profile, twitter, reddit, fundraiser, telegram, vehicle, crypto, nuclei
 - Direct-URL dorks for 20+ platforms including Telegram, Keybase, Twitter/X, Mastodon, Bluesky, GitHub, Gravatar, and others — no search engine required
 - Reverse image search across Google Lens, Yandex, TinEye, Bing Visual Search, PimEyes, SauceNAO, IQDB, and KarmaDecay — pass `--photo-url` to activate
 - Nuclei v2 integration: username enumeration across 600+ sites via `-tags osint`

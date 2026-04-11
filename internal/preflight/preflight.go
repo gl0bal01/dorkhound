@@ -35,8 +35,8 @@ type Status struct {
 
 // Report summarizes a preflight pass.
 type Report struct {
-	Checked int      // how many dorks were actually probed (direct URLs only)
-	Skipped int      // search-engine dorks passed through
+	Checked int // how many dorks were actually probed (direct URLs only)
+	Skipped int // search-engine dorks passed through
 	Alive   int
 	Dead    int
 	Results []Status // one entry per alive checked dork, in input order
