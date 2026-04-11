@@ -1,6 +1,7 @@
 package dork
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/gl0bal01/dorkhound/internal/caseinfo"
@@ -177,6 +178,80 @@ func TestApplyNoiseFilter(t *testing.T) {
 	// Ensure original slice is not mutated
 	if dorks[0].Query == got[0].Query {
 		t.Error("ApplyNoiseFilter must not mutate original slice")
+	}
+}
+
+func TestDedup(t *testing.T) {
+	// Duplicates removed; highest priority wins; order of first occurrence preserved; uniques untouched.
+	dorks := []Dork{
+		{Query: "q1", Priority: 2, Category: "social"},
+		{Query: "q2", Priority: 1, Category: "social"},
+		{Query: "q1", Priority: 3, Category: "social"}, // duplicate, higher priority
+		{Query: "q3", Priority: 2, Category: "social"},
+		{Query: "q2", Priority: 1, Category: "social"}, // duplicate, same priority (no change)
+	}
+
+	got := Dedup(dorks)
+
+	if len(got) != 3 {
+		t.Fatalf("Dedup: got %d dorks, want 3", len(got))
+	}
+	// First occurrence order: q1, q2, q3
+	if got[0].Query != "q1" || got[1].Query != "q2" || got[2].Query != "q3" {
+		t.Errorf("Dedup order wrong: got %v", []string{got[0].Query, got[1].Query, got[2].Query})
+	}
+	// q1 duplicate had higher priority 3
+	if got[0].Priority != 3 {
+		t.Errorf("Dedup: q1 priority = %d, want 3", got[0].Priority)
+	}
+	// q2 kept priority 1 (tie broken by first occurrence)
+	if got[1].Priority != 1 {
+		t.Errorf("Dedup: q2 priority = %d, want 1", got[1].Priority)
+	}
+
+	// No duplicates when all queries are unique
+	unique := []Dork{
+		{Query: "a", Priority: 1},
+		{Query: "b", Priority: 2},
+		{Query: "c", Priority: 3},
+	}
+	gotUnique := Dedup(unique)
+	if len(gotUnique) != 3 {
+		t.Errorf("Dedup unique: got %d, want 3", len(gotUnique))
+	}
+}
+
+func TestStats(t *testing.T) {
+	dorks := []Dork{
+		{Query: "q1", Category: "social", Region: "global", Priority: 3},
+		{Query: "q2", Category: "social", Region: "us", Priority: 2},
+		{Query: "q3", Category: "records", Region: "global", Priority: 1},
+		{Query: "q4", Category: "records", Region: "global", Priority: 3},
+		{Query: "q5", Category: "social", Region: "global", Priority: 2},
+	}
+
+	out := Stats(dorks)
+
+	if !strings.Contains(out, "5 total") {
+		t.Errorf("Stats missing total count; got:\n%s", out)
+	}
+	if !strings.Contains(out, "social") {
+		t.Errorf("Stats missing category 'social'; got:\n%s", out)
+	}
+	if !strings.Contains(out, "records") {
+		t.Errorf("Stats missing category 'records'; got:\n%s", out)
+	}
+	if !strings.Contains(out, "global") {
+		t.Errorf("Stats missing region 'global'; got:\n%s", out)
+	}
+	if !strings.Contains(out, "3 (high)") {
+		t.Errorf("Stats missing '3 (high)'; got:\n%s", out)
+	}
+	if !strings.Contains(out, "2 (medium)") {
+		t.Errorf("Stats missing '2 (medium)'; got:\n%s", out)
+	}
+	if !strings.Contains(out, "1 (low)") {
+		t.Errorf("Stats missing '1 (low)'; got:\n%s", out)
 	}
 }
 

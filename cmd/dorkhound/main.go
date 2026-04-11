@@ -57,6 +57,8 @@ func run(cmd *cobra.Command, args []string) error {
 	flagRegion, _ := cmd.Flags().GetString("region")
 	flagEngine, _ := cmd.Flags().GetString("engine")
 	flagDelay, _ := cmd.Flags().GetInt("delay")
+	flagBatch, _ := cmd.Flags().GetInt("batch")
+	flagBatchPause, _ := cmd.Flags().GetDuration("batch-pause")
 	flagInteractive, _ := cmd.Flags().GetBool("interactive")
 	flagNoiseFilter, _ := cmd.Flags().GetBool("noise-filter")
 	flagNuclei, _ := cmd.Flags().GetBool("nuclei")
@@ -68,6 +70,27 @@ func run(cmd *cobra.Command, args []string) error {
 	flagPreflightTimeout, _ := cmd.Flags().GetDuration("preflight-timeout")
 	flagPreflightConcurrency, _ := cmd.Flags().GetInt("preflight-concurrency")
 	flagPreflightRate, _ := cmd.Flags().GetDuration("preflight-rate")
+	flagStats, _ := cmd.Flags().GetBool("stats")
+	flagListCategories, _ := cmd.Flags().GetBool("list-categories")
+	flagListRegions, _ := cmd.Flags().GetBool("list-regions")
+
+	if flagListCategories {
+		cats := []string{"all", "social", "records", "financial", "location", "forums", "people-db",
+			"email", "phone", "username", "cache", "documents", "dating", "marketplace",
+			"nuclei", "image", "gravatar", "github", "academic", "direct-profile"}
+		for _, c := range cats {
+			fmt.Println(c)
+		}
+		return nil
+	}
+
+	if flagListRegions {
+		regions := []string{"all", "global", "us", "ca", "uk", "au", "ru", "fr", "de", "at", "nl"}
+		for _, r := range regions {
+			fmt.Println(r)
+		}
+		return nil
+	}
 
 	var c *caseinfo.Case
 	if flagInteractive {
@@ -130,6 +153,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	allDorks := dork.Generate(c)
+	allDorks = dork.Dedup(allDorks)
 
 	// Run nuclei if requested and usernames are available.
 	if flagNuclei && len(c.Usernames) > 0 {
@@ -164,6 +188,11 @@ func run(cmd *cobra.Command, args []string) error {
 		sorted = dork.ApplyNoiseFilter(sorted)
 	}
 
+	if flagStats {
+		fmt.Print(dork.Stats(sorted))
+		return nil
+	}
+
 	if flagDashboard {
 		return output.ServeDashboard(c, sorted, engine, web.DashboardHTML)
 	}
@@ -181,7 +210,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Open URLs in browser if requested.
 	if flagOpen {
-		output.OpenInBrowser(sorted, engine, time.Duration(flagDelay)*time.Millisecond)
+		output.OpenInBrowser(sorted, engine, time.Duration(flagDelay)*time.Millisecond, flagBatchPause, flagBatch)
 	}
 
 	// Export in requested format.
@@ -223,7 +252,7 @@ func init() {
 	rootCmd.Flags().StringP("name", "n", "", `Full name as "First Last"`)
 	rootCmd.Flags().StringP("location", "l", "", "Last known location")
 	rootCmd.Flags().Int("age", 0, "Approximate age")
-	rootCmd.Flags().String("dob", "", "Date of birth")
+	rootCmd.Flags().String("dob", "", "Date of birth (YYYY-MM-DD)")
 	rootCmd.Flags().String("aka", "", "Aliases/nicknames, comma-separated")
 	rootCmd.Flags().String("associates", "", "Known associates, comma-separated")
 	rootCmd.Flags().String("description", "", "Physical description")
@@ -237,14 +266,16 @@ func init() {
 	// Output flags
 	rootCmd.Flags().Bool("open", false, "Open all URLs in default browser")
 	rootCmd.Flags().Bool("dashboard", false, "Serve local web dashboard")
-	rootCmd.Flags().String("export", "", "Export format: discord, json, csv, clipboard")
+	rootCmd.Flags().String("export", "", "Export format: discord, json, csv, clipboard, tracelabs")
 	rootCmd.Flags().StringP("output", "o", "", "Write export to file instead of stdout")
 
 	// Filter flags
-	rootCmd.Flags().String("category", "all", "Filter categories")
-	rootCmd.Flags().String("region", "global", "Region filter")
-	rootCmd.Flags().String("engine", "google", "Search engine")
-	rootCmd.Flags().Int("delay", 100, "Delay in ms between opening browser tabs")
+	rootCmd.Flags().String("category", "all", "Category filter; use --list-categories for choices")
+	rootCmd.Flags().String("region", "global", "Region filter; use --list-regions for choices")
+	rootCmd.Flags().String("engine", "google", "Search engine: google, bing, duckduckgo, yandex")
+	rootCmd.Flags().Int("delay", 2000, "Delay in ms between opening browser tabs (2000 is safe for Google to avoid CAPTCHA)")
+	rootCmd.Flags().Int("batch", 10, "Number of URLs to open per batch (0 = no batching) when --open is set")
+	rootCmd.Flags().Duration("batch-pause", 30*time.Second, "Sleep duration between batches when --open is set")
 
 	// Noise filter
 	rootCmd.Flags().Bool("noise-filter", false, "Append noise-suppression operators to search queries")
@@ -260,8 +291,13 @@ func init() {
 	rootCmd.Flags().String("nuclei-tags", nuclei.DefaultTags, "Nuclei template tags to run")
 	rootCmd.Flags().Duration("nuclei-timeout", 2*time.Minute, "Timeout per username for nuclei")
 
+	// Info / utility flags
+	rootCmd.Flags().Bool("stats", false, "Print dork count breakdown by category/region/priority and exit")
+	rootCmd.Flags().Bool("list-categories", false, "Print all known category names and exit")
+	rootCmd.Flags().Bool("list-regions", false, "Print all known region names and exit")
+
 	// Other flags
-	rootCmd.Flags().BoolP("interactive", "i", false, "Interactive mode")
+	rootCmd.Flags().BoolP("interactive", "i", false, "Interactive mode (guided prompts)")
 
 	// Shell completions for enum flags.
 	// Errors here indicate a programming mistake (wrong flag name), so we panic.
@@ -271,7 +307,9 @@ func init() {
 	}{
 		{"engine", []string{"google", "bing", "duckduckgo", "yandex"}},
 		{"region", []string{"global", "all", "us", "ca", "uk", "au", "ru", "fr", "de", "at", "nl"}},
-		{"category", []string{"all", "social", "records", "financial", "location", "forums", "people-db", "email", "phone", "username", "cache", "documents", "dating", "marketplace", "nuclei", "image"}},
+		{"category", []string{"all", "social", "records", "financial", "location", "forums", "people-db",
+			"email", "phone", "username", "cache", "documents", "dating", "marketplace",
+			"nuclei", "image", "gravatar", "github", "academic", "direct-profile"}},
 		{"export", []string{"discord", "json", "csv", "clipboard", "tracelabs"}},
 	} {
 		values := reg.values

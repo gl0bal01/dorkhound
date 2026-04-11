@@ -1,6 +1,7 @@
 package dork
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -93,6 +94,81 @@ func makeSet(items []string) map[string]bool {
 // onlyGlobal returns true if the set contains only the key "global".
 func onlyGlobal(s map[string]bool) bool {
 	return len(s) == 1 && s["global"]
+}
+
+// Dedup removes duplicate dorks based on Query string. When duplicates exist,
+// the dork with the highest Priority wins (ties broken by first occurrence).
+// Input order is preserved for survivors.
+func Dedup(dorks []Dork) []Dork {
+	seen := make(map[string]int) // query -> index of best dork so far
+	var best []Dork
+	for _, d := range dorks {
+		if idx, ok := seen[d.Query]; ok {
+			if d.Priority > best[idx].Priority {
+				best[idx] = d
+			}
+			continue
+		}
+		seen[d.Query] = len(best)
+		best = append(best, d)
+	}
+	return best
+}
+
+// Stats returns a formatted breakdown of dorks by category, region, and priority.
+func Stats(dorks []Dork) string {
+	catCount := make(map[string]int)
+	regCount := make(map[string]int)
+	priCount := make(map[int]int)
+
+	for _, d := range dorks {
+		catCount[d.Category]++
+		regCount[d.Region]++
+		priCount[d.Priority]++
+	}
+
+	type kv struct {
+		key string
+		val int
+	}
+
+	sortedKV := func(m map[string]int) []kv {
+		var pairs []kv
+		for k, v := range m {
+			pairs = append(pairs, kv{k, v})
+		}
+		sort.Slice(pairs, func(i, j int) bool {
+			if pairs[i].val != pairs[j].val {
+				return pairs[i].val > pairs[j].val
+			}
+			return pairs[i].key < pairs[j].key
+		})
+		return pairs
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "Dorks: %d total\n", len(dorks))
+
+	b.WriteString("\nBy category:\n")
+	for _, p := range sortedKV(catCount) {
+		fmt.Fprintf(&b, "  %-20s %d\n", p.key, p.val)
+	}
+
+	b.WriteString("\nBy region:\n")
+	for _, p := range sortedKV(regCount) {
+		fmt.Fprintf(&b, "  %-20s %d\n", p.key, p.val)
+	}
+
+	b.WriteString("\nBy priority:\n")
+	priorities := []int{3, 2, 1}
+	labels := map[int]string{3: "3 (high)", 2: "2 (medium)", 1: "1 (low)"}
+	for _, pri := range priorities {
+		if n, ok := priCount[pri]; ok {
+			fmt.Fprintf(&b, "  %-20s %d\n", labels[pri], n)
+		}
+	}
+
+	return b.String()
 }
 
 // ApplyNoiseFilter appends negative-site operators to each dork's Query to

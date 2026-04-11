@@ -5,390 +5,1113 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DORK Dashboard</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:#0d1117;color:#c9d1d9;font-size:13px;line-height:1.4;padding:16px;max-width:1280px;margin:0 auto}
+h1{color:#58a6ff;font-size:1.4rem;margin-bottom:4px}
+h2{color:#58a6ff;font-size:1.1rem;margin-bottom:8px}
+a{color:#58a6ff;text-decoration:none}
+a:hover{text-decoration:underline}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #58a6ff;outline-offset:2px}
 
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-    background: #0d1117;
-    color: #c9d1d9;
-    line-height: 1.6;
-    padding: 24px;
-    max-width: 1200px;
-    margin: 0 auto;
-  }
+.case-info{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px 18px;margin-bottom:12px}
+.case-meta{display:flex;gap:20px;flex-wrap:wrap;margin-top:6px;color:#8b949e;font-size:0.9rem}
+.case-meta strong{color:#c9d1d9}
+.status-summary{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:0.85rem}
+.summary-badge{background:#21262d;border:1px solid #30363d;border-radius:12px;padding:2px 10px;cursor:pointer;transition:background 0.15s;white-space:nowrap;font-family:inherit;font-size:0.85rem;color:#c9d1d9}
+.summary-badge:hover{background:#30363d}
+.summary-badge.active{border-color:#58a6ff;color:#58a6ff}
 
-  h1 { color: #58a6ff; font-size: 1.8rem; margin-bottom: 4px; }
-  h2 { color: #58a6ff; font-size: 1.3rem; margin-bottom: 12px; }
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+.filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px}
+.filter-bar label{color:#8b949e;font-size:0.85rem}
+.filter-count{color:#8b949e;font-size:0.85rem;margin-left:auto}
+input[type=text],input[type=url]{background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:4px 8px;font-size:0.85rem;font-family:inherit}
+input[type=text]:focus,input[type=url]:focus{border-color:#58a6ff}
+select{background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:4px 8px;font-size:0.85rem;font-family:inherit}
+textarea{background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:6px 8px;font-size:0.85rem;font-family:inherit;resize:vertical;width:100%}
+#filter-text{width:220px}
+#filter-cat{height:80px;min-width:140px}
 
-  .case-info {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 24px;
-  }
+.btn{background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:0.85rem;font-family:inherit;transition:background 0.15s;white-space:nowrap}
+.btn:hover{background:#30363d}
+.btn-primary{background:#1f6feb;border-color:#1f6feb;color:#fff}
+.btn-primary:hover{background:#388bfd}
+.btn-danger{background:#21262d;border-color:#f85149;color:#f85149}
+.btn-danger:hover{background:#f85149;color:#fff}
+.btn-sm{padding:2px 8px;font-size:0.78rem;border-radius:4px}
+.btn-icon{background:transparent;border:none;color:#8b949e;cursor:pointer;padding:2px 4px;font-size:0.85rem;border-radius:4px;transition:color 0.15s;font-family:inherit}
+.btn-icon:hover{color:#c9d1d9;background:#21262d}
 
-  .case-meta {
-    display: flex;
-    gap: 24px;
-    flex-wrap: wrap;
-    margin-top: 8px;
-    color: #8b949e;
-  }
+.dropdown-container{position:relative}
+.dropdown-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;background:#1c2128;border:1px solid #30363d;border-radius:8px;padding:8px;z-index:200;min-width:240px;box-shadow:0 8px 24px rgba(0,0,0,0.4)}
+.dropdown-container.open .dropdown-menu{display:block}
+.dropdown-menu-label{font-size:0.78rem;color:#8b949e;padding:2px 6px 6px;display:block}
+.menu-radio-label,.menu-check-label{display:flex;align-items:center;gap:6px;padding:4px 6px;cursor:pointer;border-radius:4px;color:#c9d1d9;font-size:0.85rem}
+.menu-radio-label:hover,.menu-check-label:hover{background:#21262d}
+.menu-divider{border:none;border-top:1px solid #30363d;margin:6px 0}
+.menu-actions{display:flex;gap:6px;margin-top:8px}
+.batch-progress{font-size:0.8rem;color:#8b949e;margin-top:6px}
 
-  .case-meta span { font-size: 0.95rem; }
-  .case-meta strong { color: #c9d1d9; }
+.category-section{background:#161b22;border:1px solid #30363d;border-radius:8px;margin-bottom:10px;overflow:hidden}
+.category-header{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:#1c2128;border-bottom:1px solid #30363d;position:sticky;top:0;z-index:10}
+.category-title{font-weight:600;color:#58a6ff;font-size:0.9rem}
+.category-actions{display:flex;gap:6px;align-items:center}
 
-  .toolbar {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-bottom: 24px;
-  }
+.link-row{display:flex;align-items:center;gap:8px;padding:5px 8px 5px 14px;border-bottom:1px solid #21262d;border-left:4px solid transparent;transition:border-color 0.1s;position:relative}
+.link-row:last-of-type{border-bottom:none}
+.link-row.selected{background:#1c2128}
+.link-row[data-status="pending"]{border-left-color:#484f58}
+.link-row[data-status="useful"]{border-left-color:#3fb950}
+.link-row[data-status="dead end"]{border-left-color:#f85149}
+.link-row[data-status="reviewed"]{border-left-color:#58a6ff}
+.link-row.hidden{display:none}
 
-  .btn {
-    background: #21262d;
-    color: #c9d1d9;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: 8px 16px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: background 0.15s;
-  }
+.row-status{width:100px;flex-shrink:0}
+.link-label{min-width:140px;max-width:200px;font-weight:500;flex-shrink:0;color:#c9d1d9;font-size:0.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.link-url{color:#58a6ff;word-break:break-all;flex:1;min-width:0;font-size:0.8rem}
+.notes-indicator{color:#e3b341;font-size:0.7rem;margin-left:2px;flex-shrink:0}
 
-  .btn:hover { background: #30363d; }
-  .btn-primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
-  .btn-primary:hover { background: #388bfd; }
+.notes-panel{display:none;padding:8px 14px 10px 18px;background:#0d1117;border-bottom:1px solid #21262d;border-left:4px solid #484f58}
+.notes-panel.open{display:block}
+.notes-panel[data-status="useful"]{border-left-color:#3fb950}
+.notes-panel[data-status="dead end"]{border-left-color:#f85149}
+.notes-panel[data-status="reviewed"]{border-left-color:#58a6ff}
+.notes-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.notes-field label{display:block;color:#8b949e;font-size:0.78rem;margin-bottom:3px}
+.notes-actions{display:flex;gap:6px;margin-top:8px;align-items:center}
 
-  .category-section {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 8px;
-    margin-bottom: 16px;
-    overflow: hidden;
-  }
+.toast{position:fixed;bottom:20px;right:20px;background:#1f6feb;color:#fff;padding:8px 18px;border-radius:6px;font-size:0.85rem;opacity:0;transform:translateY(8px);transition:opacity 0.25s,transform 0.25s;pointer-events:none;z-index:9999}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.warn{background:#e3b341;color:#0d1117}
+.toast.err{background:#f85149}
 
-  .category-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 14px 20px;
-    background: #1c2128;
-    border-bottom: 1px solid #30363d;
-  }
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:5000;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.overlay-box{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:24px 28px;max-width:480px;width:100%}
+.overlay-box h2{margin-bottom:14px}
+.shortcut-table{width:100%;border-collapse:collapse;font-size:0.85rem}
+.shortcut-table td{padding:4px 8px;border-bottom:1px solid #21262d}
+.shortcut-table td:first-child{color:#58a6ff;font-family:monospace;font-weight:600;width:60px}
+.shortcut-table tr:last-child td{border-bottom:none}
 
-  .category-title { font-weight: 600; color: #58a6ff; }
-
-  .link-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 20px;
-    border-bottom: 1px solid #21262d;
-    flex-wrap: wrap;
-  }
-
-  .link-row:last-child { border-bottom: none; }
-
-  .link-row select {
-    background: #0d1117;
-    color: #c9d1d9;
-    border: 1px solid #30363d;
-    border-radius: 4px;
-    padding: 4px 8px;
-    font-size: 0.85rem;
-  }
-
-  .link-label {
-    min-width: 160px;
-    font-weight: 500;
-    flex-shrink: 0;
-    color: #c9d1d9;
-  }
-
-  .link-url {
-    color: #58a6ff;
-    text-decoration: none;
-    word-break: break-all;
-    flex: 1;
-    min-width: 0;
-  }
-
-  .link-url:hover { text-decoration: underline; }
-
-  .btn-copy-small {
-    background: #21262d;
-    color: #8b949e;
-    border: 1px solid #30363d;
-    border-radius: 4px;
-    padding: 2px 8px;
-    cursor: pointer;
-    font-size: 0.8rem;
-    flex-shrink: 0;
-  }
-
-  .btn-copy-small:hover { background: #30363d; color: #c9d1d9; }
-
-  .toast {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    background: #1f6feb;
-    color: #fff;
-    padding: 12px 24px;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    opacity: 0;
-    transform: translateY(10px);
-    transition: opacity 0.3s, transform 0.3s;
-    pointer-events: none;
-    z-index: 1000;
-  }
-
-  .toast.show {
-    opacity: 1;
-    transform: translateY(0);
-  }
+#import-file{display:none}
 </style>
 </head>
 <body>
-
 <div id="app"></div>
-<div id="toast" class="toast"></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<div id="help-overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="help-title">
+  <div class="overlay-box">
+    <h2 id="help-title">Keyboard Shortcuts</h2>
+    <table class="shortcut-table" aria-label="Keyboard shortcuts reference">
+      <tbody id="shortcut-tbody"></tbody>
+    </table>
+    <button class="btn btn-sm" style="margin-top:14px" id="help-close-btn" aria-label="Close help overlay">Close</button>
+  </div>
+</div>
+
+<input type="file" id="import-file" accept=".json" aria-label="Import state JSON file">
 
 <script>
 "use strict";
 
 const data = /*DATA_PLACEHOLDER*/{};
 
-function showToast(message) {
-  var el = document.getElementById("toast");
-  el.textContent = message;
-  el.classList.add("show");
-  setTimeout(function() { el.classList.remove("show"); }, 2000);
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const CATEGORY_ORDER = [
+  "image","username","direct-profile","email","phone","gravatar","github",
+  "social","people-db","nuclei","cache","records","academic","documents",
+  "forums","financial","location","dating","marketplace","other"
+];
+
+const SHORTCUTS = [
+  ["/",       "Focus filter input"],
+  ["Esc",     "Clear filter / close help"],
+  ["j / k",   "Move selection down / up"],
+  ["x",       "Toggle selected row pending \u2194 useful"],
+  ["d",       "Mark selected row dead end"],
+  ["n",       "Toggle notes panel for selected row"],
+  ["?",       "Show / hide this help"],
+];
+
+// ─── Runtime state ────────────────────────────────────────────────────────────
+
+let state = { version: 1, updatedAt: "", links: {} };
+let groups = {};
+let filterText = "";
+let filterStatus = "all";
+let filterCats = new Set();
+let selectedRowEl = null;
+let batchCursor = 0;
+let lastToastTime = 0;
+let toastTimer = null;
+
+const storageKey = () =>
+  "dorkhound:state:" + ((data.case_info && data.case_info.name) ? data.case_info.name : "unknown");
+
+// ─── LocalStorage ─────────────────────────────────────────────────────────────
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(storageKey());
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.version === 1 && parsed.links && typeof parsed.links === "object") {
+        state = parsed;
+      }
+    }
+  } catch (e) { /* ignore */ }
+}
+
+const saveStateDebounced = debounce(function () {
+  state.updatedAt = new Date().toISOString();
+  try {
+    localStorage.setItem(storageKey(), JSON.stringify(state));
+  } catch (e) {
+    showToast("Storage full — could not save", "err");
+    return;
+  }
+  const now = Date.now();
+  if (now - lastToastTime > 2000) {
+    lastToastTime = now;
+    showToast("Saved");
+  }
+}, 300);
+
+function getLinkState(id) {
+  return state.links[id] || { status: "pending", notes: "", evidence: "", flaggedAt: "" };
+}
+
+function setLinkField(id, field, value) {
+  if (!state.links[id]) {
+    state.links[id] = { status: "pending", notes: "", evidence: "", flaggedAt: "" };
+  }
+  state.links[id][field] = value;
+  saveStateDebounced();
+}
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+
+function debounce(fn, ms) {
+  let t;
+  return function (...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); };
+}
+
+function makeLinkId(cat, url) {
+  try {
+    const b64 = btoa(unescape(encodeURIComponent(url)))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+    return cat + ":" + b64.slice(0, 16);
+  } catch (e) {
+    return cat + ":" + url.slice(0, 16).replace(/[^a-zA-Z0-9]/g, "_");
+  }
+}
+
+function showToast(msg, type) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = "toast" + (type ? " " + type : "") + " show";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.classList.remove("show"); }, 2500);
+}
+
+function mk(tag, props) {
+  const e = document.createElement(tag);
+  if (!props) return e;
+  for (const [k, v] of Object.entries(props)) {
+    if (k === "class") { e.className = v; }
+    else if (k === "style") { e.style.cssText = v; }
+    else if (k.startsWith("on")) { e.addEventListener(k.slice(2), v); }
+    else { e.setAttribute(k, v); }
+  }
+  return e;
+}
+
+function txt(str) { return document.createTextNode(str != null ? String(str) : ""); }
+
+function append(parent, ...children) {
+  for (const c of children) {
+    if (c != null) parent.appendChild(typeof c === "string" ? txt(c) : c);
+  }
+  return parent;
 }
 
 function copyText(text) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(function() {
-      showToast("Copied to clipboard");
-    }).catch(function() {
-      showToast("Failed to copy");
-    });
+    navigator.clipboard.writeText(text)
+      .then(() => showToast("Copied"))
+      .catch(() => showToast("Copy failed", "err"));
   } else {
-    showToast("Clipboard not available");
+    showToast("Clipboard unavailable", "err");
   }
 }
 
-function buildCaseInfo(container, caseData) {
-  var section = document.createElement("div");
-  section.className = "case-info";
+function downloadText(filename, content) {
+  const a = mk("a");
+  a.href = URL.createObjectURL(new Blob([content], { type: "application/octet-stream" }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
-  var h1 = document.createElement("h1");
-  h1.textContent = "OSINT Dashboard: " + (caseData.name || "Unknown");
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+function caseName() {
+  const n = (data.case_info && data.case_info.name) ? data.case_info.name : "case";
+  return n.replace(/\s+/g, "-").toLowerCase();
+}
+
+// ─── Group + ID assignment ────────────────────────────────────────────────────
+
+function buildGroups(results) {
+  const g = {};
+  for (const r of results) {
+    const cat = r.category || "other";
+    if (!g[cat]) g[cat] = [];
+    g[cat].push({ label: r.label, url: r.url, category: cat, id: makeLinkId(cat, r.url) });
+  }
+  const ordered = {};
+  for (const c of CATEGORY_ORDER) { if (g[c]) ordered[c] = g[c]; }
+  for (const c of Object.keys(g)) { if (!ordered[c]) ordered[c] = g[c]; }
+  return ordered;
+}
+
+// ─── Summary ─────────────────────────────────────────────────────────────────
+
+function computeSummary() {
+  let total = 0, pending = 0, useful = 0, dead = 0, reviewed = 0, hasNotes = 0;
+  for (const items of Object.values(groups)) {
+    for (const item of items) {
+      total++;
+      const ls = getLinkState(item.id);
+      if (ls.status === "pending") pending++;
+      else if (ls.status === "useful") useful++;
+      else if (ls.status === "dead end") dead++;
+      else if (ls.status === "reviewed") reviewed++;
+      if (ls.notes && ls.notes.trim()) hasNotes++;
+    }
+  }
+  return { total, pending, useful, dead, reviewed, hasNotes };
+}
+
+function updateSummary() {
+  const summaryEl = document.getElementById("status-summary");
+  if (!summaryEl) return;
+  const s = computeSummary();
+  summaryEl.textContent = "";
+  const badges = [
+    ["all",       "Total: " + s.total],
+    ["pending",   "Pending: " + s.pending],
+    ["useful",    "Useful: " + s.useful],
+    ["dead end",  "Dead: " + s.dead],
+    ["reviewed",  "Reviewed: " + s.reviewed],
+    ["has notes", "Notes: " + s.hasNotes],
+  ];
+  for (const [key, label] of badges) {
+    const b = mk("button", {
+      class: "summary-badge" + (filterStatus === key ? " active" : ""),
+      "aria-label": "Filter by " + key,
+      "aria-pressed": filterStatus === key ? "true" : "false",
+    });
+    b.textContent = label;
+    b.addEventListener("click", () => {
+      filterStatus = key;
+      const sel = document.getElementById("filter-status");
+      if (sel) sel.value = key;
+      applyFilters();
+    });
+    summaryEl.appendChild(b);
+  }
+  const cnt = document.getElementById("filter-count");
+  if (cnt) {
+    const visible = document.querySelectorAll(".link-row:not(.hidden)").length;
+    const total2 = document.querySelectorAll(".link-row").length;
+    cnt.textContent = visible === total2 ? "Showing all " + total2 : "Showing " + visible + " of " + total2;
+  }
+}
+
+// ─── Filtering ────────────────────────────────────────────────────────────────
+
+function applyFilters() {
+  const txt2 = filterText.toLowerCase();
+  for (const [cat, items] of Object.entries(groups)) {
+    const section = document.getElementById("cat-section-" + cat);
+    if (!section) continue;
+    let visCount = 0;
+    for (const item of items) {
+      const row = document.getElementById("row-" + item.id);
+      const panel = document.getElementById("panel-" + item.id);
+      if (!row) continue;
+      const ls = getLinkState(item.id);
+      let show = true;
+      if (txt2 && !(item.label.toLowerCase().includes(txt2) || item.url.toLowerCase().includes(txt2))) show = false;
+      if (show) {
+        if (filterStatus === "pending" && ls.status !== "pending") show = false;
+        else if (filterStatus === "useful" && ls.status !== "useful") show = false;
+        else if (filterStatus === "dead end" && ls.status !== "dead end") show = false;
+        else if (filterStatus === "reviewed" && ls.status !== "reviewed") show = false;
+        else if (filterStatus === "has notes" && !(ls.notes && ls.notes.trim())) show = false;
+      }
+      if (show && filterCats.size > 0 && !filterCats.has(cat)) show = false;
+      if (show) {
+        row.classList.remove("hidden");
+        if (panel) panel.classList.remove("hidden");
+        visCount++;
+      } else {
+        row.classList.add("hidden");
+        if (panel) panel.classList.add("hidden");
+      }
+    }
+    section.style.display = visCount === 0 ? "none" : "";
+  }
+  updateSummary();
+}
+
+// ─── Status update ────────────────────────────────────────────────────────────
+
+function setStatus(id, status) {
+  setLinkField(id, "status", status);
+  const row = document.getElementById("row-" + id);
+  if (row) {
+    row.dataset.status = status;
+    const sel = row.querySelector(".row-status");
+    if (sel) sel.value = status;
+  }
+  const panel = document.getElementById("panel-" + id);
+  if (panel) panel.dataset.status = status;
+  applyFilters();
+}
+
+function updateNotesIndicator(id) {
+  const ind = document.getElementById("notes-ind-" + id);
+  if (!ind) return;
+  const ls = getLinkState(id);
+  ind.style.display = ((ls.notes && ls.notes.trim()) || (ls.evidence && ls.evidence.trim())) ? "" : "none";
+}
+
+// ─── Build: Case Info ─────────────────────────────────────────────────────────
+
+function buildCaseInfo(container) {
+  const ci = data.case_info || {};
+  const section = mk("div", { class: "case-info" });
+  const h1 = mk("h1");
+  h1.textContent = "OSINT Dashboard: " + (ci.name || "Unknown");
   section.appendChild(h1);
 
-  var meta = document.createElement("div");
-  meta.className = "case-meta";
-
-  if (caseData.location) {
-    var span = document.createElement("span");
-    var strong = document.createElement("strong");
+  const meta = mk("div", { class: "case-meta" });
+  if (ci.location) {
+    const s = mk("span");
+    const strong = mk("strong");
     strong.textContent = "Location: ";
-    span.appendChild(strong);
-    span.appendChild(document.createTextNode(caseData.location));
-    meta.appendChild(span);
+    s.appendChild(strong);
+    s.appendChild(txt(ci.location));
+    meta.appendChild(s);
   }
-
-  if (caseData.age) {
-    var span = document.createElement("span");
-    var strong = document.createElement("strong");
+  if (ci.age) {
+    const s = mk("span");
+    const strong = mk("strong");
     strong.textContent = "Age: ";
-    span.appendChild(strong);
-    span.appendChild(document.createTextNode("~" + caseData.age));
-    meta.appendChild(span);
+    s.appendChild(strong);
+    s.appendChild(txt("~" + ci.age));
+    meta.appendChild(s);
   }
-
-  if (caseData.dob) {
-    var span = document.createElement("span");
-    var strong = document.createElement("strong");
+  if (ci.dob) {
+    const s = mk("span");
+    const strong = mk("strong");
     strong.textContent = "DOB: ";
-    span.appendChild(strong);
-    span.appendChild(document.createTextNode(caseData.dob));
-    meta.appendChild(span);
+    s.appendChild(strong);
+    s.appendChild(txt(ci.dob));
+    meta.appendChild(s);
   }
-
   section.appendChild(meta);
+
+  const summary = mk("div", { class: "status-summary", id: "status-summary" });
+  section.appendChild(summary);
   container.appendChild(section);
 }
 
-function buildToolbar(container, groups) {
-  var toolbar = document.createElement("div");
-  toolbar.className = "toolbar";
+// ─── Build: Toolbar ───────────────────────────────────────────────────────────
 
-  var exportBtn = document.createElement("button");
-  exportBtn.className = "btn btn-primary";
-  exportBtn.textContent = "Export to Discord";
-  exportBtn.addEventListener("click", function() { exportDiscord(groups); });
-  toolbar.appendChild(exportBtn);
+function buildToolbar(container) {
+  const toolbar = mk("div", { class: "toolbar" });
 
-  var openAllBtn = document.createElement("button");
-  openAllBtn.className = "btn";
-  openAllBtn.textContent = "Open All in Browser";
-  openAllBtn.addEventListener("click", function() { openAllLinks(groups); });
-  toolbar.appendChild(openAllBtn);
+  // Export dropdown
+  const exportCont = mk("div", { class: "dropdown-container" });
+  const exportBtn = mk("button", {
+    class: "btn btn-primary",
+    "aria-label": "Open export menu",
+    "aria-haspopup": "true",
+  });
+  exportBtn.textContent = "Export \u25be";
+  const exportMenu = mk("div", { class: "dropdown-menu", role: "menu" });
+
+  const fmtHeading = mk("span", { class: "dropdown-menu-label" });
+  fmtHeading.textContent = "Format";
+  exportMenu.appendChild(fmtHeading);
+
+  const formats = [["discord", "Discord (markdown)", true], ["tracelabs", "TraceLabs (markdown)", false], ["json", "JSON (full state)", false]];
+  for (const [val, labelTxt, checked] of formats) {
+    const lbl = mk("label", { class: "menu-radio-label" });
+    const inp = mk("input", { type: "radio", name: "exp-fmt", value: val });
+    if (checked) inp.checked = true;
+    lbl.appendChild(inp);
+    lbl.appendChild(txt(" " + labelTxt));
+    exportMenu.appendChild(lbl);
+  }
+
+  const hr1 = mk("hr", { class: "menu-divider" });
+  exportMenu.appendChild(hr1);
+
+  const filtLbl = mk("label", { class: "menu-check-label" });
+  const filtInp = mk("input", { type: "checkbox", id: "exp-filtered" });
+  filtLbl.appendChild(filtInp);
+  filtLbl.appendChild(txt(" Only filtered results"));
+  exportMenu.appendChild(filtLbl);
+
+  const menuActions = mk("div", { class: "menu-actions" });
+  const copyBtn = mk("button", { class: "btn btn-sm", "aria-label": "Copy export to clipboard" });
+  copyBtn.textContent = "Copy";
+  copyBtn.addEventListener("click", () => {
+    copyText(buildExport(exportMenu));
+    exportCont.classList.remove("open");
+  });
+  const dlBtn = mk("button", { class: "btn btn-sm btn-primary", "aria-label": "Download export as file" });
+  dlBtn.textContent = "Download";
+  dlBtn.addEventListener("click", () => {
+    const fmt = exportMenu.querySelector("input[name=exp-fmt]:checked").value;
+    const ext = fmt === "json" ? "json" : "md";
+    downloadText("dorkhound-" + caseName() + "-export." + ext, buildExport(exportMenu));
+    exportCont.classList.remove("open");
+  });
+  append(menuActions, copyBtn, dlBtn);
+  exportMenu.appendChild(menuActions);
+
+  exportBtn.addEventListener("click", e => { e.stopPropagation(); exportCont.classList.toggle("open"); });
+  append(exportCont, exportBtn, exportMenu);
+  toolbar.appendChild(exportCont);
+
+  // Batch open dropdown
+  const batchCont = mk("div", { class: "dropdown-container" });
+  const batchBtn = mk("button", {
+    class: "btn",
+    "aria-label": "Open batch menu",
+    "aria-haspopup": "true",
+  });
+  batchBtn.textContent = "Open Batch \u25be";
+  const batchMenu = mk("div", { class: "dropdown-menu", role: "menu" });
+
+  const next10Btn = mk("button", { class: "btn btn-sm", "aria-label": "Open next 10 pending leads in new tabs" });
+  next10Btn.textContent = "Open next 10";
+  next10Btn.addEventListener("click", () => openBatch(10));
+
+  const openAllBtn = mk("button", { class: "btn btn-sm", "aria-label": "Open all filtered leads in batches of 10" });
+  openAllBtn.textContent = "Open all filtered";
+  openAllBtn.addEventListener("click", () => openAllFiltered());
+
+  const resetBtn = mk("button", { class: "btn btn-sm", "aria-label": "Reset batch cursor to beginning" });
+  resetBtn.textContent = "Reset cursor";
+  resetBtn.addEventListener("click", () => {
+    batchCursor = 0;
+    const prog = document.getElementById("batch-progress");
+    if (prog) prog.textContent = "Cursor reset.";
+  });
+
+  const batchProg = mk("div", { class: "batch-progress", id: "batch-progress" });
+  batchProg.textContent = "";
+
+  append(batchMenu, next10Btn, txt(" "), openAllBtn, txt(" "), resetBtn, batchProg);
+  batchBtn.addEventListener("click", e => { e.stopPropagation(); batchCont.classList.toggle("open"); });
+  append(batchCont, batchBtn, batchMenu);
+  toolbar.appendChild(batchCont);
+
+  // State management
+  const dlStateBtn = mk("button", { class: "btn", "aria-label": "Download current state as JSON" });
+  dlStateBtn.textContent = "Download state";
+  dlStateBtn.addEventListener("click", () => {
+    state.updatedAt = new Date().toISOString();
+    downloadText("dorkhound-" + caseName() + "-state.json", JSON.stringify(state, null, 2));
+  });
+  toolbar.appendChild(dlStateBtn);
+
+  const importBtn = mk("button", { class: "btn", "aria-label": "Import state from JSON file" });
+  importBtn.textContent = "Import state";
+  importBtn.addEventListener("click", () => document.getElementById("import-file").click());
+  toolbar.appendChild(importBtn);
+
+  const clearBtn = mk("button", { class: "btn btn-danger", "aria-label": "Clear all saved state for this case" });
+  clearBtn.textContent = "Clear state";
+  clearBtn.addEventListener("click", () => {
+    if (confirm("Clear all saved state for this case? This cannot be undone.")) {
+      localStorage.removeItem(storageKey());
+      state = { version: 1, updatedAt: "", links: {} };
+      location.reload();
+    }
+  });
+  toolbar.appendChild(clearBtn);
+
+  const helpBtn = mk("button", { class: "btn", "aria-label": "Show keyboard shortcuts help" });
+  helpBtn.textContent = "Shortcuts ?";
+  helpBtn.addEventListener("click", () => document.getElementById("help-overlay").classList.add("open"));
+  toolbar.appendChild(helpBtn);
 
   container.appendChild(toolbar);
 }
 
-function exportDiscord(groups) {
-  var lines = [];
-  lines.push("## OSINT Results: " + (data.case_info.name || "Unknown"));
+// ─── Build: Filter bar ────────────────────────────────────────────────────────
 
-  var metaParts = [];
-  if (data.case_info.location) { metaParts.push("**Location:** " + data.case_info.location); }
-  if (data.case_info.age) { metaParts.push("**Age:** ~" + data.case_info.age); }
-  if (data.case_info.dob) { metaParts.push("**DOB:** " + data.case_info.dob); }
-  if (metaParts.length > 0) { lines.push(metaParts.join(" | ")); }
+function buildFilterBar(container) {
+  const bar = mk("div", { class: "filter-bar" });
 
-  var categoryKeys = Object.keys(groups);
-  for (var ci = 0; ci < categoryKeys.length; ci++) {
-    var cat = categoryKeys[ci];
-    var items = groups[cat];
-    var included = [];
+  const txtLabel = mk("label", { for: "filter-text" });
+  txtLabel.textContent = "Filter:";
+  bar.appendChild(txtLabel);
 
-    for (var i = 0; i < items.length; i++) {
-      var selectEl = document.getElementById("status-" + cat + "-" + i);
-      var status = selectEl ? selectEl.value : "pending";
-      if (status === "pending" || status === "useful") {
-        included.push(items[i]);
-      }
-    }
+  const txtInp = mk("input", {
+    type: "text", id: "filter-text",
+    placeholder: "label or URL\u2026",
+    "aria-label": "Filter by text",
+  });
+  txtInp.addEventListener("input", () => { filterText = txtInp.value; applyFilters(); });
+  bar.appendChild(txtInp);
 
-    if (included.length > 0) {
-      lines.push("");
-      lines.push("### " + cat.charAt(0).toUpperCase() + cat.slice(1) + " (" + included.length + " links)");
-      for (var j = 0; j < included.length; j++) {
-        lines.push("- " + included[j].label + ": " + included[j].url);
-      }
-    }
+  const statusLabel = mk("label", { for: "filter-status" });
+  statusLabel.textContent = "Status:";
+  bar.appendChild(statusLabel);
+
+  const statusSel = mk("select", { id: "filter-status", "aria-label": "Filter by status" });
+  for (const [v, t] of [
+    ["all","All"],["pending","Pending"],["useful","Useful"],
+    ["dead end","Dead end"],["reviewed","Reviewed"],["has notes","Has notes"]
+  ]) {
+    const opt = mk("option", { value: v });
+    opt.textContent = t;
+    statusSel.appendChild(opt);
   }
+  statusSel.addEventListener("change", () => { filterStatus = statusSel.value; applyFilters(); });
+  bar.appendChild(statusSel);
 
-  copyText(lines.join("\n"));
+  const catLabel = mk("label", { for: "filter-cat" });
+  catLabel.textContent = "Category:";
+  bar.appendChild(catLabel);
+
+  const catSel = mk("select", { id: "filter-cat", multiple: "", "aria-label": "Filter by category, use Ctrl/Cmd+click for multi-select" });
+  for (const cat of Object.keys(groups)) {
+    const opt = mk("option", { value: cat });
+    opt.textContent = capitalize(cat);
+    catSel.appendChild(opt);
+  }
+  catSel.addEventListener("change", () => {
+    filterCats = new Set([...catSel.selectedOptions].map(o => o.value));
+    applyFilters();
+  });
+  bar.appendChild(catSel);
+
+  const clearFiltersBtn = mk("button", { class: "btn btn-sm", "aria-label": "Clear all active filters" });
+  clearFiltersBtn.textContent = "Clear filters";
+  clearFiltersBtn.addEventListener("click", () => {
+    filterText = ""; filterStatus = "all"; filterCats = new Set();
+    txtInp.value = "";
+    statusSel.value = "all";
+    for (const opt of catSel.options) opt.selected = false;
+    applyFilters();
+  });
+  bar.appendChild(clearFiltersBtn);
+
+  const countEl = mk("span", { class: "filter-count", id: "filter-count" });
+  bar.appendChild(countEl);
+
+  container.appendChild(bar);
 }
 
-function openAllLinks(groups) {
-  var categoryKeys = Object.keys(groups);
-  for (var ci = 0; ci < categoryKeys.length; ci++) {
-    var items = groups[categoryKeys[ci]];
-    for (var i = 0; i < items.length; i++) {
-      window.open(items[i].url, "_blank");
-    }
-  }
-}
+// ─── Build: Categories ────────────────────────────────────────────────────────
 
-function groupByCategory(results) {
-  var groups = {};
-  for (var i = 0; i < results.length; i++) {
-    var r = results[i];
-    var cat = r.category || "other";
-    if (!groups[cat]) { groups[cat] = []; }
-    groups[cat].push(r);
-  }
-  return groups;
-}
+function buildCategories(container) {
+  for (const [cat, items] of Object.entries(groups)) {
+    const section = mk("div", { class: "category-section", id: "cat-section-" + cat });
 
-function buildCategories(container, groups) {
-  var categoryKeys = Object.keys(groups);
-
-  for (var ci = 0; ci < categoryKeys.length; ci++) {
-    var cat = categoryKeys[ci];
-    var items = groups[cat];
-
-    var section = document.createElement("div");
-    section.className = "category-section";
-
-    var header = document.createElement("div");
-    header.className = "category-header";
-
-    var title = document.createElement("span");
-    title.className = "category-title";
-    title.textContent = cat.charAt(0).toUpperCase() + cat.slice(1) + " (" + items.length + ")";
+    const header = mk("div", { class: "category-header" });
+    const title = mk("span", { class: "category-title" });
+    title.textContent = capitalize(cat) + " (" + items.length + ")";
     header.appendChild(title);
 
-    var copyAllBtn = document.createElement("button");
-    copyAllBtn.className = "btn-copy-small";
-    copyAllBtn.textContent = "Copy all in category";
-    (function(catItems) {
-      copyAllBtn.addEventListener("click", function() {
-        var urls = [];
-        for (var k = 0; k < catItems.length; k++) {
-          urls.push(catItems[k].url);
-        }
-        copyText(urls.join("\n"));
-      });
-    })(items);
-    header.appendChild(copyAllBtn);
-
+    const actions = mk("div", { class: "category-actions" });
+    const copyCatBtn = mk("button", { class: "btn btn-sm", "aria-label": "Copy all URLs in category " + cat });
+    copyCatBtn.textContent = "Copy all";
+    copyCatBtn.addEventListener("click", () => copyText(items.map(i => i.url).join("\n")));
+    actions.appendChild(copyCatBtn);
+    header.appendChild(actions);
     section.appendChild(header);
 
-    for (var i = 0; i < items.length; i++) {
-      var item = items[i];
-
-      var row = document.createElement("div");
-      row.className = "link-row";
-
-      var select = document.createElement("select");
-      select.id = "status-" + cat + "-" + i;
-
-      var options = ["pending", "useful", "dead end", "reviewed"];
-      for (var oi = 0; oi < options.length; oi++) {
-        var opt = document.createElement("option");
-        opt.value = options[oi];
-        opt.textContent = options[oi];
-        select.appendChild(opt);
-      }
-      row.appendChild(select);
-
-      var label = document.createElement("span");
-      label.className = "link-label";
-      label.textContent = item.label;
-      row.appendChild(label);
-
-      var link = document.createElement("a");
-      link.className = "link-url";
-      link.setAttribute("href", item.url);
-      link.setAttribute("target", "_blank");
-      link.setAttribute("rel", "noopener noreferrer");
-      link.textContent = item.url;
-      row.appendChild(link);
-
-      var copyBtn = document.createElement("button");
-      copyBtn.className = "btn-copy-small";
-      copyBtn.textContent = "Copy";
-      (function(url) {
-        copyBtn.addEventListener("click", function() { copyText(url); });
-      })(item.url);
-      row.appendChild(copyBtn);
-
-      section.appendChild(row);
+    for (const item of items) {
+      section.appendChild(buildRow(item));
+      section.appendChild(buildNotesPanel(item));
     }
-
     container.appendChild(section);
   }
 }
 
+// ─── Build: Row ───────────────────────────────────────────────────────────────
+
+function buildRow(item) {
+  const ls = getLinkState(item.id);
+  const row = mk("div", {
+    class: "link-row",
+    id: "row-" + item.id,
+    "data-status": ls.status,
+    "data-id": item.id,
+    tabindex: "0",
+    role: "row",
+  });
+
+  const sel = mk("select", { class: "row-status", "aria-label": "Status for " + item.label });
+  for (const s of ["pending", "useful", "dead end", "reviewed"]) {
+    const opt = mk("option", { value: s });
+    opt.textContent = s;
+    if (s === ls.status) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  sel.addEventListener("change", () => setStatus(item.id, sel.value));
+  row.appendChild(sel);
+
+  const labelEl = mk("span", { class: "link-label", title: item.label });
+  labelEl.textContent = item.label;
+  row.appendChild(labelEl);
+
+  const ind = mk("span", {
+    class: "notes-indicator",
+    id: "notes-ind-" + item.id,
+    title: "Has notes or evidence",
+    "aria-label": "Has notes",
+  });
+  ind.textContent = "\u25cf";
+  ind.style.display = ((ls.notes && ls.notes.trim()) || (ls.evidence && ls.evidence.trim())) ? "" : "none";
+  row.appendChild(ind);
+
+  const link = mk("a", {
+    class: "link-url",
+    href: item.url,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    "aria-label": item.label + " (opens in new tab)",
+  });
+  link.textContent = item.url;
+  link.addEventListener("click", () => {
+    if (getLinkState(item.id).status === "pending") setStatus(item.id, "reviewed");
+  });
+  row.appendChild(link);
+
+  const copyBtn = mk("button", { class: "btn-icon btn-sm", "aria-label": "Copy URL for " + item.label });
+  copyBtn.textContent = "\u29b8";
+  copyBtn.addEventListener("click", () => copyText(item.url));
+  row.appendChild(copyBtn);
+
+  const notesToggle = mk("button", { class: "btn-icon btn-sm", "aria-label": "Toggle notes panel for " + item.label, "aria-expanded": "false" });
+  notesToggle.textContent = "\u25be";
+  notesToggle.addEventListener("click", () => toggleNotes(item.id, notesToggle));
+  row.appendChild(notesToggle);
+
+  row.addEventListener("focus", () => selectRow(row));
+  row.addEventListener("click", e => {
+    if (e.target === row || e.target === labelEl) selectRow(row);
+  });
+
+  return row;
+}
+
+// ─── Build: Notes panel ───────────────────────────────────────────────────────
+
+function buildNotesPanel(item) {
+  const ls = getLinkState(item.id);
+  const panel = mk("div", {
+    class: "notes-panel",
+    id: "panel-" + item.id,
+    "data-status": ls.status,
+    "data-id": item.id,
+  });
+
+  const fields = mk("div", { class: "notes-fields" });
+
+  const notesField = mk("div", { class: "notes-field" });
+  const notesLabel = mk("label", { for: "notes-txt-" + item.id });
+  notesLabel.textContent = "Notes";
+  const notesTxt = mk("textarea", {
+    id: "notes-txt-" + item.id,
+    rows: "3",
+    placeholder: "Findings, observations\u2026",
+    "aria-label": "Notes for " + item.label,
+    maxlength: "2000",
+  });
+  notesTxt.value = ls.notes || "";
+  notesTxt.addEventListener("input", debounce(() => {
+    setLinkField(item.id, "notes", notesTxt.value);
+    updateNotesIndicator(item.id);
+    updateSummary();
+  }, 300));
+  append(notesField, notesLabel, notesTxt);
+  fields.appendChild(notesField);
+
+  const evidField = mk("div", { class: "notes-field" });
+  const evidLabel = mk("label", { for: "evidence-inp-" + item.id });
+  evidLabel.textContent = "Evidence URL / path";
+  const evidInp = mk("input", {
+    type: "url",
+    id: "evidence-inp-" + item.id,
+    placeholder: "https://\u2026 or /path/to/screenshot",
+    "aria-label": "Evidence URL or path for " + item.label,
+  });
+  evidInp.value = ls.evidence || "";
+  evidInp.addEventListener("input", debounce(() => {
+    setLinkField(item.id, "evidence", evidInp.value);
+    updateNotesIndicator(item.id);
+  }, 300));
+  append(evidField, evidLabel, evidInp);
+  fields.appendChild(evidField);
+
+  panel.appendChild(fields);
+
+  const panelActions = mk("div", { class: "notes-actions" });
+  const flagBtn = mk("button", { class: "btn btn-sm btn-primary", "aria-label": "Flag this lead as useful" });
+  flagBtn.textContent = "\u2713 Flag as useful";
+  flagBtn.addEventListener("click", () => {
+    setLinkField(item.id, "flaggedAt", new Date().toISOString());
+    setStatus(item.id, "useful");
+    showToast("Flagged as useful");
+  });
+  panelActions.appendChild(flagBtn);
+  panel.appendChild(panelActions);
+
+  return panel;
+}
+
+function toggleNotes(id, toggleBtn) {
+  const panel = document.getElementById("panel-" + id);
+  if (!panel) return;
+  const isOpen = panel.classList.toggle("open");
+  if (toggleBtn) toggleBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+}
+
+// ─── Row selection ────────────────────────────────────────────────────────────
+
+function selectRow(rowEl) {
+  if (selectedRowEl) selectedRowEl.classList.remove("selected");
+  selectedRowEl = rowEl;
+  if (rowEl) rowEl.classList.add("selected");
+}
+
+function getVisibleRows() {
+  return [...document.querySelectorAll(".link-row:not(.hidden)")];
+}
+
+function moveSelection(delta) {
+  const rows = getVisibleRows();
+  if (!rows.length) return;
+  let idx = selectedRowEl ? rows.indexOf(selectedRowEl) : -1;
+  idx = Math.max(0, Math.min(rows.length - 1, idx + delta));
+  selectRow(rows[idx]);
+  rows[idx].scrollIntoView({ block: "nearest" });
+  rows[idx].focus();
+}
+
+// ─── Batch open ───────────────────────────────────────────────────────────────
+
+function getFilteredItems() {
+  return getVisibleRows().map(r => {
+    const id = r.dataset.id;
+    for (const items of Object.values(groups)) {
+      const found = items.find(i => i.id === id);
+      if (found) return found;
+    }
+    return null;
+  }).filter(Boolean);
+}
+
+function openBatch(n) {
+  const items = getFilteredItems();
+  const slice = items.slice(batchCursor, batchCursor + n);
+  if (!slice.length) { showToast("No more leads to open", "warn"); return; }
+  slice.forEach((item, i) => {
+    setTimeout(() => {
+      const w = window.open(item.url, "_blank");
+      if (!w) {
+        showToast("Popups blocked \u2014 allow popups for this page", "warn");
+      } else if (getLinkState(item.id).status === "pending") {
+        setStatus(item.id, "reviewed");
+      }
+    }, i * 500);
+  });
+  batchCursor += slice.length;
+  const prog = document.getElementById("batch-progress");
+  if (prog) prog.textContent = "Opened " + slice.length + " (cursor at " + batchCursor + "/" + items.length + ")";
+}
+
+function openAllFiltered() {
+  const items = getFilteredItems();
+  if (!items.length) { showToast("No items to open", "warn"); return; }
+  const BATCH = 10;
+  const PAUSE_MS = 30000;
+  const totalBatches = Math.ceil(items.length / BATCH);
+  let currentBatch = 0;
+  const prog = document.getElementById("batch-progress");
+
+  function openNext() {
+    if (currentBatch >= totalBatches) {
+      if (prog) prog.textContent = "Done \u2014 opened all " + items.length + " leads.";
+      return;
+    }
+    const slice = items.slice(currentBatch * BATCH, (currentBatch + 1) * BATCH);
+    slice.forEach((item, i) => {
+      setTimeout(() => {
+        const w = window.open(item.url, "_blank");
+        if (!w) showToast("Popups blocked \u2014 allow popups", "warn");
+        else if (getLinkState(item.id).status === "pending") setStatus(item.id, "reviewed");
+      }, i * 500);
+    });
+    currentBatch++;
+    if (currentBatch < totalBatches) {
+      let remaining = Math.ceil(PAUSE_MS / 1000);
+      const tick = setInterval(() => {
+        remaining--;
+        if (prog) prog.textContent = "Batch " + currentBatch + "/" + totalBatches + ", next in " + remaining + "s\u2026";
+        if (remaining <= 0) { clearInterval(tick); openNext(); }
+      }, 1000);
+    } else {
+      if (prog) prog.textContent = "Batch " + currentBatch + "/" + totalBatches + " complete.";
+    }
+  }
+  openNext();
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+
+function buildExport(menuEl) {
+  const ci = data.case_info || {};
+  const fmt = menuEl.querySelector("input[name=exp-fmt]:checked").value;
+  const onlyFiltered = menuEl.querySelector("#exp-filtered").checked;
+  const filteredIds = onlyFiltered ? new Set(getFilteredItems().map(i => i.id)) : null;
+  const orderedCats = [...CATEGORY_ORDER.filter(c => groups[c]), ...Object.keys(groups).filter(c => !CATEGORY_ORDER.includes(c))];
+
+  if (fmt === "json") {
+    const out = { version: state.version, updatedAt: new Date().toISOString(), case: ci, links: {} };
+    for (const [cat, items] of Object.entries(groups)) {
+      for (const item of items) {
+        if (filteredIds && !filteredIds.has(item.id)) continue;
+        out.links[item.id] = { ...getLinkState(item.id), label: item.label, url: item.url, category: cat };
+      }
+    }
+    return JSON.stringify(out, null, 2);
+  }
+
+  if (fmt === "tracelabs") {
+    const lines = [
+      "# TraceLabs Submission \u2014 " + (ci.name || "Unknown"),
+      "Generated: " + new Date().toISOString(),
+      "",
+      "## Case",
+    ];
+    if (ci.name)     lines.push("- **Name:** " + ci.name);
+    if (ci.location) lines.push("- **Location:** " + ci.location);
+    if (ci.age)      lines.push("- **Age:** ~" + ci.age);
+    if (ci.dob)      lines.push("- **DOB:** " + ci.dob);
+    lines.push("", "## Leads by Category");
+    for (const cat of orderedCats) {
+      const items = groups[cat];
+      if (!items) continue;
+      const relevant = items.filter(i => {
+        if (filteredIds && !filteredIds.has(i.id)) return false;
+        const ls = getLinkState(i.id);
+        return ls.status === "pending" || ls.status === "useful";
+      });
+      if (!relevant.length) continue;
+      lines.push("", "### " + capitalize(cat) + " (" + relevant.length + ")");
+      for (const item of relevant) {
+        const ls = getLinkState(item.id);
+        lines.push("- [ ] " + item.label + " \u2014 " + item.url);
+        if (ls.notes && ls.notes.trim()) lines.push("  - Notes: " + ls.notes.trim());
+        if (ls.evidence && ls.evidence.trim()) lines.push("  - Evidence: " + ls.evidence.trim());
+      }
+    }
+    lines.push(
+      "", "## Submission workflow",
+      "1. Open each link in order of priority.",
+      "2. Mark \u2611 as you review.",
+      "3. For each hit, capture: source URL, screenshot, extracted data.",
+      "4. Cross-reference against TraceLabs flag categories before submission."
+    );
+    return lines.join("\n");
+  }
+
+  // Discord markdown
+  const lines = ["## OSINT Results: " + (ci.name || "Unknown")];
+  const meta = [];
+  if (ci.location) meta.push("**Location:** " + ci.location);
+  if (ci.age)      meta.push("**Age:** ~" + ci.age);
+  if (ci.dob)      meta.push("**DOB:** " + ci.dob);
+  if (meta.length) lines.push(meta.join(" | "));
+  for (const cat of orderedCats) {
+    const items = groups[cat];
+    if (!items) continue;
+    const included = items.filter(i => {
+      if (filteredIds && !filteredIds.has(i.id)) return false;
+      const ls = getLinkState(i.id);
+      return ls.status === "pending" || ls.status === "useful";
+    });
+    if (!included.length) continue;
+    lines.push("", "### " + capitalize(cat) + " (" + included.length + " links)");
+    for (const item of included) {
+      const ls = getLinkState(item.id);
+      let line = "- " + item.label + ": <" + item.url + ">";
+      if (ls.notes && ls.notes.trim()) line += "\n  > " + ls.notes.trim();
+      if (ls.evidence && ls.evidence.trim()) line += "\n  > Evidence: " + ls.evidence.trim();
+      lines.push(line);
+    }
+  }
+  return lines.join("\n");
+}
+
+// ─── Import ───────────────────────────────────────────────────────────────────
+
+function handleImport(file) {
+  const reader = new FileReader();
+  reader.addEventListener("load", e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (!parsed || parsed.version !== 1 || !parsed.links || typeof parsed.links !== "object") {
+        showToast("Invalid state file — wrong format", "err");
+        return;
+      }
+      for (const [id, val] of Object.entries(parsed.links)) {
+        if (typeof val === "object" && val !== null) {
+          state.links[id] = { ...(state.links[id] || {}), ...val };
+        }
+      }
+      saveStateDebounced();
+      for (const items of Object.values(groups)) {
+        for (const item of items) {
+          const ls = getLinkState(item.id);
+          setStatus(item.id, ls.status);
+          const notesTxt = document.getElementById("notes-txt-" + item.id);
+          const evidInp  = document.getElementById("evidence-inp-" + item.id);
+          if (notesTxt) notesTxt.value = ls.notes || "";
+          if (evidInp)  evidInp.value  = ls.evidence || "";
+          updateNotesIndicator(item.id);
+        }
+      }
+      updateSummary();
+      showToast("State imported successfully");
+    } catch (err) {
+      showToast("Failed to parse JSON file", "err");
+    }
+  });
+  reader.readAsText(file);
+}
+
+// ─── Help overlay ─────────────────────────────────────────────────────────────
+
+function buildHelpOverlay() {
+  const tbody = document.getElementById("shortcut-tbody");
+  if (!tbody) return;
+  for (const [key, desc] of SHORTCUTS) {
+    const tr = mk("tr");
+    const td1 = mk("td"); td1.textContent = key;
+    const td2 = mk("td"); td2.textContent = desc;
+    append(tr, td1, td2);
+    tbody.appendChild(tr);
+  }
+  document.getElementById("help-close-btn").addEventListener("click", closeHelp);
+  document.getElementById("help-overlay").addEventListener("click", e => {
+    if (e.target === document.getElementById("help-overlay")) closeHelp();
+  });
+}
+
+function closeHelp() {
+  document.getElementById("help-overlay").classList.remove("open");
+}
+
+// ─── Keyboard shortcuts ───────────────────────────────────────────────────────
+
+function initKeyboard() {
+  document.addEventListener("keydown", e => {
+    const tag = document.activeElement ? document.activeElement.tagName : "";
+    const isInput = (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT");
+
+    if (e.key === "Escape") {
+      if (document.getElementById("help-overlay").classList.contains("open")) { closeHelp(); return; }
+      document.querySelectorAll(".dropdown-container.open").forEach(c => c.classList.remove("open"));
+      if (filterText) {
+        filterText = "";
+        const fi = document.getElementById("filter-text");
+        if (fi) fi.value = "";
+        applyFilters();
+      }
+      return;
+    }
+
+    if (e.key === "/" && !isInput) {
+      e.preventDefault();
+      const fi = document.getElementById("filter-text");
+      if (fi) fi.focus();
+      return;
+    }
+
+    if (e.key === "?" && !isInput) {
+      document.getElementById("help-overlay").classList.toggle("open");
+      return;
+    }
+
+    if (isInput) return;
+
+    if (e.key === "j") { e.preventDefault(); moveSelection(1); }
+    else if (e.key === "k") { e.preventDefault(); moveSelection(-1); }
+    else if (e.key === "x" && selectedRowEl) {
+      const id = selectedRowEl.dataset.id;
+      const ls = getLinkState(id);
+      setStatus(id, ls.status === "useful" ? "pending" : "useful");
+    }
+    else if (e.key === "d" && selectedRowEl) {
+      setStatus(selectedRowEl.dataset.id, "dead end");
+    }
+    else if (e.key === "n" && selectedRowEl) {
+      const id = selectedRowEl.dataset.id;
+      const toggleBtn = selectedRowEl.querySelector(".btn-icon:last-child");
+      toggleNotes(id, toggleBtn);
+    }
+  });
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
 function init() {
-  var app = document.getElementById("app");
+  loadState();
+  groups = buildGroups(data.results || []);
 
-  var caseData = data.case_info || {};
-  var results = data.results || [];
-  var groups = groupByCategory(results);
+  const app = document.getElementById("app");
+  buildCaseInfo(app);
+  buildToolbar(app);
+  buildFilterBar(app);
 
-  buildCaseInfo(app, caseData);
-  buildToolbar(app, groups);
-  buildCategories(app, groups);
+  const catContainer = mk("div", { id: "categories" });
+  app.appendChild(catContainer);
+  buildCategories(catContainer);
+
+  // Close dropdowns on outside click
+  document.addEventListener("click", () => {
+    document.querySelectorAll(".dropdown-container.open").forEach(c => c.classList.remove("open"));
+  });
+
+  // Import file handler
+  document.getElementById("import-file").addEventListener("change", function () {
+    if (this.files && this.files[0]) {
+      handleImport(this.files[0]);
+      this.value = "";
+    }
+  });
+
+  buildHelpOverlay();
+  initKeyboard();
+  updateSummary();
+  applyFilters();
 }
 
 init();

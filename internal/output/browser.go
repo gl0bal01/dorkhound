@@ -11,15 +11,23 @@ import (
 	"github.com/gl0bal01/dorkhound/internal/dork"
 )
 
-// OpenInBrowser opens all dork URLs in the default browser.
-func OpenInBrowser(dorks []dork.Dork, engine string, delay time.Duration) {
-	for _, d := range dorks {
+// OpenInBrowser opens all dork URLs in the default browser, with optional
+// batching. batchSize URLs are opened with delay between each; then batchPause
+// is slept before the next batch. If batchSize <= 0, no batching is applied.
+func OpenInBrowser(dorks []dork.Dork, engine string, delay, batchPause time.Duration, batchSize int) {
+	for i, d := range dorks {
 		u := d.URL(engine)
 		if err := openURL(u); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: failed to open %s: %v\n", d.Label, err)
 		}
-		if delay > 0 {
+		if delay > 0 && i < len(dorks)-1 {
 			time.Sleep(delay)
+		}
+		if batchSize > 0 && batchPause > 0 && (i+1)%batchSize == 0 && i < len(dorks)-1 {
+			batchNum := (i + 1) / batchSize
+			fmt.Fprintf(os.Stderr, "opened batch %d (%d/%d), sleeping %s...\n",
+				batchNum, i+1, len(dorks), batchPause)
+			time.Sleep(batchPause)
 		}
 	}
 }
