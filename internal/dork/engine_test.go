@@ -154,6 +154,32 @@ func TestSort_ByPriority(t *testing.T) {
 	}
 }
 
+func TestApplyNoiseFilter(t *testing.T) {
+	dorks := []Dork{
+		{Query: `"John Doe" site:facebook.com`, Category: "social", Region: "global", Priority: 3},
+		{Query: "https://haveibeenpwned.com/account/foo%40bar.com", Category: "email", Region: "global", Priority: 3},
+		{Query: "http://example.com/profile", Category: "email", Region: "global", Priority: 2},
+	}
+	got := ApplyNoiseFilter(dorks)
+	if len(got) != 3 {
+		t.Fatalf("ApplyNoiseFilter: got %d dorks, want 3", len(got))
+	}
+	const suffix = ` -site:pinterest.com -site:amazon.com -site:etsy.com -"baby name"`
+	if got[0].Query != dorks[0].Query+suffix {
+		t.Errorf("search query: got %q, want suffix appended", got[0].Query)
+	}
+	if got[1].Query != dorks[1].Query {
+		t.Errorf("https URL dork should be unchanged, got %q", got[1].Query)
+	}
+	if got[2].Query != dorks[2].Query {
+		t.Errorf("http URL dork should be unchanged, got %q", got[2].Query)
+	}
+	// Ensure original slice is not mutated
+	if dorks[0].Query == got[0].Query {
+		t.Error("ApplyNoiseFilter must not mutate original slice")
+	}
+}
+
 func TestGenerate_Empty(t *testing.T) {
 	// Save and restore the global registry to isolate this test
 	saved := registry

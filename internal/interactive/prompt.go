@@ -45,12 +45,18 @@ func Run() (*Result, error) {
 		return nil, err
 	}
 
+	var emails, phones, usernames, photoURL string
+
 	// Step 2: Additional info
 	err = huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().Title("Aliases (comma-separated, optional)").Value(&aka),
 			huh.NewInput().Title("Known associates (comma-separated, optional)").Value(&associates),
 			huh.NewInput().Title("Physical description (optional)").Value(&description),
+			huh.NewInput().Title("Email addresses (comma-separated, optional)").Value(&emails),
+			huh.NewInput().Title("Phone numbers (comma-separated, optional)").Value(&phones),
+			huh.NewInput().Title("Usernames/handles (comma-separated, optional)").Value(&usernames),
+			huh.NewInput().Title("Photo URL (optional, for reverse image search)").Value(&photoURL),
 		),
 	).Run()
 	if err != nil {
@@ -90,6 +96,15 @@ func Run() (*Result, error) {
 					huh.NewOption("Location", "location"),
 					huh.NewOption("Forums", "forums"),
 					huh.NewOption("People databases", "people-db"),
+					huh.NewOption("Email", "email"),
+					huh.NewOption("Phone", "phone"),
+					huh.NewOption("Username", "username"),
+					huh.NewOption("Cache/Archive", "cache"),
+					huh.NewOption("Documents", "documents"),
+					huh.NewOption("Dating", "dating"),
+					huh.NewOption("Marketplace", "marketplace"),
+					huh.NewOption("Nuclei results", "nuclei"),
+					huh.NewOption("Image/reverse search", "image"),
 				).Value(&category),
 			huh.NewConfirm().Title("Open results in browser?").Value(&openBrowser),
 		),
@@ -109,6 +124,16 @@ func Run() (*Result, error) {
 	if associates != "" {
 		c.Associates = caseinfo.SplitTrim(associates)
 	}
+	if emails != "" {
+		c.Emails = caseinfo.SplitTrim(emails)
+	}
+	if phones != "" {
+		c.Phones = caseinfo.SplitTrim(phones)
+	}
+	if usernames != "" {
+		c.Usernames = caseinfo.SplitTrim(usernames)
+	}
+	c.PhotoURL = photoURL
 	if age != "" {
 		parsed, err := strconv.Atoi(strings.TrimSpace(age))
 		if err != nil {

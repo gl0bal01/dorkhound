@@ -24,6 +24,11 @@ type Case struct {
 	Region      string   `yaml:"region" json:"region"`
 	Categories  []string `yaml:"categories" json:"categories"`
 	Engine      string   `yaml:"engine" json:"engine"`
+	Emails      []string `yaml:"emails" json:"emails"`
+	Phones      []string `yaml:"phones" json:"phones"`
+	Usernames   []string `yaml:"usernames" json:"usernames"`
+	PhotoURL    string   `yaml:"photo_url" json:"photo_url"`
+	PhotoPath   string   `yaml:"photo_path" json:"photo_path"`
 }
 
 // ParseName splits a full name into first and last name components.
@@ -125,4 +130,24 @@ func (c *Case) Merge(overrides *Case) {
 	if overrides.Engine != "" {
 		c.Engine = overrides.Engine
 	}
+	if len(overrides.Emails) > 0 {
+		c.Emails = overrides.Emails
+	}
+	if len(overrides.Phones) > 0 {
+		c.Phones = overrides.Phones
+	}
+	if len(overrides.Usernames) > 0 {
+		c.Usernames = overrides.Usernames
+	}
+	if overrides.PhotoURL != "" {
+		c.PhotoURL = overrides.PhotoURL
+	}
+	if overrides.PhotoPath != "" {
+		c.PhotoPath = overrides.PhotoPath
+	}
+}
+
+// PhotoSearchURL returns the URL to use for reverse image search.
+func (c *Case) PhotoSearchURL() string {
+	return c.PhotoURL
 }

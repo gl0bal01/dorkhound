@@ -32,6 +32,11 @@ func generateSocialDorks(c *caseinfo.Case) []Dork {
 		{"github.com", "GitHub"},
 		{"medium.com", "Medium"},
 		{"reddit.com", "Reddit"},
+		{"pinterest.com", "Pinterest"},
+		{"threads.net", "Threads"},
+		{"bsky.app", "Bluesky"},
+		{"mastodon.social", "Mastodon"},
+		{"t.me", "Telegram"},
 	}
 
 	for _, s := range globalSites {
@@ -59,6 +64,23 @@ func generateSocialDorks(c *caseinfo.Case) []Dork {
 		Region:   "global",
 		Priority: 2,
 		Label:    "Generic profile/about/bio pages",
+	})
+
+	// Discord mentions (Discord has no site: indexing)
+	discordQ := fmt.Sprintf(`"%s" "discord.gg" OR "%s" "discord.com/users"`, name, name)
+	dorks = append(dorks, Dork{
+		Query:    discordQ,
+		Category: "social",
+		Region:   "global",
+		Priority: 1,
+		Label:    "Discord mention",
+	})
+	dorks = append(dorks, Dork{
+		Query:    fmt.Sprintf(`"%s" site:disboard.org OR site:top.gg`, name),
+		Category: "social",
+		Region:   "global",
+		Priority: 1,
+		Label:    "Discord server directories",
 	})
 
 	// Alias searches on major social platforms

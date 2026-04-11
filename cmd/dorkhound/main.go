@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -9,8 +10,10 @@ import (
 
 	"github.com/gl0bal01/dorkhound/internal/caseinfo"
 	"github.com/gl0bal01/dorkhound/internal/dork"
+	"github.com/gl0bal01/dorkhound/internal/integrations/nuclei"
 	"github.com/gl0bal01/dorkhound/internal/interactive"
 	"github.com/gl0bal01/dorkhound/internal/output"
+	"github.com/gl0bal01/dorkhound/internal/preflight"
 	"github.com/gl0bal01/dorkhound/web"
 	"github.com/spf13/cobra"
 )
@@ -41,6 +44,9 @@ func run(cmd *cobra.Command, args []string) error {
 	flagAssociates, _ := cmd.Flags().GetString("associates")
 	flagDescription, _ := cmd.Flags().GetString("description")
 	flagCase, _ := cmd.Flags().GetString("case")
+	flagEmails, _ := cmd.Flags().GetString("emails")
+	flagPhones, _ := cmd.Flags().GetString("phones")
+	flagUsernames, _ := cmd.Flags().GetString("usernames")
 
 	flagOpen, _ := cmd.Flags().GetBool("open")
 	flagDashboard, _ := cmd.Flags().GetBool("dashboard")
@@ -52,6 +58,16 @@ func run(cmd *cobra.Command, args []string) error {
 	flagEngine, _ := cmd.Flags().GetString("engine")
 	flagDelay, _ := cmd.Flags().GetInt("delay")
 	flagInteractive, _ := cmd.Flags().GetBool("interactive")
+	flagNoiseFilter, _ := cmd.Flags().GetBool("noise-filter")
+	flagNuclei, _ := cmd.Flags().GetBool("nuclei")
+	flagNucleiTags, _ := cmd.Flags().GetString("nuclei-tags")
+	flagNucleiTimeout, _ := cmd.Flags().GetDuration("nuclei-timeout")
+	flagPreflight, _ := cmd.Flags().GetBool("preflight")
+	flagPhotoURL, _ := cmd.Flags().GetString("photo-url")
+	flagPhotoPath, _ := cmd.Flags().GetString("photo-path")
+	flagPreflightTimeout, _ := cmd.Flags().GetDuration("preflight-timeout")
+	flagPreflightConcurrency, _ := cmd.Flags().GetInt("preflight-concurrency")
+	flagPreflightRate, _ := cmd.Flags().GetDuration("preflight-rate")
 
 	var c *caseinfo.Case
 	if flagInteractive {
@@ -87,6 +103,17 @@ func run(cmd *cobra.Command, args []string) error {
 		if flagAssociates != "" {
 			cliCase.Associates = caseinfo.SplitTrim(flagAssociates)
 		}
+		if flagEmails != "" {
+			cliCase.Emails = caseinfo.SplitTrim(flagEmails)
+		}
+		if flagPhones != "" {
+			cliCase.Phones = caseinfo.SplitTrim(flagPhones)
+		}
+		if flagUsernames != "" {
+			cliCase.Usernames = caseinfo.SplitTrim(flagUsernames)
+		}
+		cliCase.PhotoURL = flagPhotoURL
+		cliCase.PhotoPath = flagPhotoPath
 
 		// Merge: if case loaded from file, merge CLI overrides; otherwise use CLI case.
 		if c != nil {
@@ -104,12 +131,38 @@ func run(cmd *cobra.Command, args []string) error {
 
 	allDorks := dork.Generate(c)
 
+	// Run nuclei if requested and usernames are available.
+	if flagNuclei && len(c.Usernames) > 0 {
+		nucleiDorks, err := nuclei.Run(context.Background(), c.Usernames, flagNucleiTags, flagNucleiTimeout)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "nuclei: %v\n", err)
+		}
+		allDorks = append(allDorks, nucleiDorks...)
+	}
+
 	categories := caseinfo.SplitTrim(flagCategory)
 	regions := caseinfo.SplitTrim(flagRegion)
 	engine := strings.ToLower(flagEngine)
 
 	filtered := dork.Filter(allDorks, categories, regions)
 	sorted := dork.Sort(filtered)
+
+	if flagPreflight {
+		ctx, cancel := context.WithCancel(cmd.Context())
+		defer cancel()
+		survivors, preflightReport := preflight.Run(ctx, sorted, preflight.Options{
+			Concurrency: flagPreflightConcurrency,
+			Timeout:     flagPreflightTimeout,
+			RateLimit:   flagPreflightRate,
+		})
+		fmt.Fprintf(os.Stderr, "preflight: %d checked, %d alive, %d dead (%d search dorks skipped)\n",
+			preflightReport.Checked, preflightReport.Alive, preflightReport.Dead, preflightReport.Skipped)
+		sorted = survivors
+	}
+
+	if flagNoiseFilter {
+		sorted = dork.ApplyNoiseFilter(sorted)
+	}
 
 	if flagDashboard {
 		return output.ServeDashboard(c, sorted, engine, web.DashboardHTML)
@@ -149,13 +202,17 @@ func run(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("copying to clipboard: %w", err)
 		}
 		fmt.Fprintln(os.Stderr, "Copied to clipboard.")
+	case "tracelabs":
+		if err := output.TraceLabs(w, c, sorted, engine); err != nil {
+			return fmt.Errorf("writing TraceLabs: %w", err)
+		}
 	case "":
 		// Default: print to stdout (unless --open was the only action).
 		if !flagOpen {
 			output.Stdout(w, sorted, engine)
 		}
 	default:
-		return fmt.Errorf("unknown export format %q: use discord, json, csv, or clipboard", exportFormat)
+		return fmt.Errorf("unknown export format %q: use discord, json, csv, clipboard, or tracelabs", exportFormat)
 	}
 
 	return nil
@@ -171,6 +228,11 @@ func init() {
 	rootCmd.Flags().String("associates", "", "Known associates, comma-separated")
 	rootCmd.Flags().String("description", "", "Physical description")
 	rootCmd.Flags().String("case", "", "Path to YAML/JSON case file")
+	rootCmd.Flags().String("emails", "", "Email addresses, comma-separated")
+	rootCmd.Flags().String("phones", "", "Phone numbers, comma-separated")
+	rootCmd.Flags().String("usernames", "", "Usernames/handles, comma-separated")
+	rootCmd.Flags().String("photo-url", "", "URL of the target's photo for reverse image search")
+	rootCmd.Flags().String("photo-path", "", "Local path to the target's photo (operator note only)")
 
 	// Output flags
 	rootCmd.Flags().Bool("open", false, "Open all URLs in default browser")
@@ -184,6 +246,20 @@ func init() {
 	rootCmd.Flags().String("engine", "google", "Search engine")
 	rootCmd.Flags().Int("delay", 100, "Delay in ms between opening browser tabs")
 
+	// Noise filter
+	rootCmd.Flags().Bool("noise-filter", false, "Append noise-suppression operators to search queries")
+
+	// Preflight flags
+	rootCmd.Flags().Bool("preflight", false, "Probe direct-URL dorks and drop dead links before output")
+	rootCmd.Flags().Duration("preflight-timeout", 5*time.Second, "Per-request timeout for preflight probes")
+	rootCmd.Flags().Int("preflight-concurrency", 8, "Max parallel preflight HTTP requests")
+	rootCmd.Flags().Duration("preflight-rate", 250*time.Millisecond, "Per-worker cooldown between preflight requests")
+
+	// Nuclei flags
+	rootCmd.Flags().Bool("nuclei", false, "Run nuclei OSINT templates against usernames (requires nuclei in PATH)")
+	rootCmd.Flags().String("nuclei-tags", nuclei.DefaultTags, "Nuclei template tags to run")
+	rootCmd.Flags().Duration("nuclei-timeout", 2*time.Minute, "Timeout per username for nuclei")
+
 	// Other flags
 	rootCmd.Flags().BoolP("interactive", "i", false, "Interactive mode")
 
@@ -195,8 +271,8 @@ func init() {
 	}{
 		{"engine", []string{"google", "bing", "duckduckgo", "yandex"}},
 		{"region", []string{"global", "all", "us", "ca", "uk", "au", "ru", "fr", "de", "at", "nl"}},
-		{"category", []string{"all", "social", "records", "financial", "location", "forums", "people-db"}},
-		{"export", []string{"discord", "json", "csv", "clipboard"}},
+		{"category", []string{"all", "social", "records", "financial", "location", "forums", "people-db", "email", "phone", "username", "cache", "documents", "dating", "marketplace", "nuclei", "image"}},
+		{"export", []string{"discord", "json", "csv", "clipboard", "tracelabs"}},
 	} {
 		values := reg.values
 		if err := rootCmd.RegisterFlagCompletionFunc(reg.flag, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

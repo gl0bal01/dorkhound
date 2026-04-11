@@ -2,6 +2,7 @@ package dork
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/gl0bal01/dorkhound/internal/caseinfo"
 )
@@ -92,4 +93,20 @@ func makeSet(items []string) map[string]bool {
 // onlyGlobal returns true if the set contains only the key "global".
 func onlyGlobal(s map[string]bool) bool {
 	return len(s) == 1 && s["global"]
+}
+
+// ApplyNoiseFilter appends negative-site operators to each dork's Query to
+// suppress common noise domains (Pinterest recipe spam, Amazon, baby-name
+// SEO pages). It only mutates dorks whose Query looks like a search query
+// (not direct http(s) URLs).
+func ApplyNoiseFilter(dorks []Dork) []Dork {
+	const suffix = ` -site:pinterest.com -site:amazon.com -site:etsy.com -"baby name"`
+	out := make([]Dork, len(dorks))
+	for i, d := range dorks {
+		out[i] = d
+		if !strings.HasPrefix(d.Query, "http://") && !strings.HasPrefix(d.Query, "https://") {
+			out[i].Query = d.Query + suffix
+		}
+	}
+	return out
 }

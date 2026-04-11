@@ -351,6 +351,83 @@ func TestMerge(t *testing.T) {
 			t.Errorf("Categories should remain unchanged, got %v", base.Categories)
 		}
 	})
+
+	t.Run("emails phones usernames replace when non-empty", func(t *testing.T) {
+		base := &Case{
+			Emails:    []string{"old@example.com"},
+			Phones:    []string{"555-0000"},
+			Usernames: []string{"olduser"},
+		}
+
+		overrides := &Case{
+			Emails:    []string{"new@example.com", "new2@example.com"},
+			Phones:    []string{"555-9999"},
+			Usernames: []string{"newuser"},
+		}
+
+		base.Merge(overrides)
+
+		if len(base.Emails) != 2 || base.Emails[0] != "new@example.com" {
+			t.Errorf("Emails = %v, want [new@example.com new2@example.com]", base.Emails)
+		}
+		if len(base.Phones) != 1 || base.Phones[0] != "555-9999" {
+			t.Errorf("Phones = %v, want [555-9999]", base.Phones)
+		}
+		if len(base.Usernames) != 1 || base.Usernames[0] != "newuser" {
+			t.Errorf("Usernames = %v, want [newuser]", base.Usernames)
+		}
+	})
+
+	t.Run("empty emails phones usernames do not replace", func(t *testing.T) {
+		base := &Case{
+			Emails:    []string{"keep@example.com"},
+			Phones:    []string{"555-1111"},
+			Usernames: []string{"keepuser"},
+		}
+
+		base.Merge(&Case{}) // all zero values
+
+		if len(base.Emails) != 1 || base.Emails[0] != "keep@example.com" {
+			t.Errorf("Emails should remain unchanged, got %v", base.Emails)
+		}
+		if len(base.Phones) != 1 || base.Phones[0] != "555-1111" {
+			t.Errorf("Phones should remain unchanged, got %v", base.Phones)
+		}
+		if len(base.Usernames) != 1 || base.Usernames[0] != "keepuser" {
+			t.Errorf("Usernames should remain unchanged, got %v", base.Usernames)
+		}
+	})
+
+	t.Run("photo url and path replace when non-empty", func(t *testing.T) {
+		base := &Case{
+			PhotoURL:  "https://old.example.com/photo.jpg",
+			PhotoPath: "/old/path/photo.jpg",
+		}
+		base.Merge(&Case{
+			PhotoURL:  "https://new.example.com/photo.jpg",
+			PhotoPath: "/new/path/photo.jpg",
+		})
+		if base.PhotoURL != "https://new.example.com/photo.jpg" {
+			t.Errorf("PhotoURL = %q, want new value", base.PhotoURL)
+		}
+		if base.PhotoPath != "/new/path/photo.jpg" {
+			t.Errorf("PhotoPath = %q, want new value", base.PhotoPath)
+		}
+	})
+
+	t.Run("empty photo fields do not replace", func(t *testing.T) {
+		base := &Case{
+			PhotoURL:  "https://keep.example.com/photo.jpg",
+			PhotoPath: "/keep/path/photo.jpg",
+		}
+		base.Merge(&Case{})
+		if base.PhotoURL != "https://keep.example.com/photo.jpg" {
+			t.Errorf("PhotoURL should remain unchanged, got %q", base.PhotoURL)
+		}
+		if base.PhotoPath != "/keep/path/photo.jpg" {
+			t.Errorf("PhotoPath should remain unchanged, got %q", base.PhotoPath)
+		}
+	})
 }
 
 func TestSplitTrim(t *testing.T) {

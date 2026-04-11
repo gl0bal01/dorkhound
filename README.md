@@ -158,6 +158,61 @@ dorkhound -n "John Doe" --export clipboard
 | `forums` | Reddit, Quora, forum profiles, associate cross-references |
 | `people-db` | Direct lookups on Spokeo, Whitepages, TruePeopleSearch, etc. |
 
+## Nuclei integration (username enumeration)
+
+Install the nuclei binary and OSINT templates:
+
+```bash
+go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest
+nuclei -update-templates
+```
+
+Run dorkhound with nuclei enabled:
+
+```bash
+dorkhound --name "Jane Doe" --usernames "jdoe42" --nuclei
+# Custom tags and timeout
+dorkhound --name "Jane Doe" --usernames "jdoe42" --nuclei --nuclei-tags osint --nuclei-timeout 5m
+```
+
+Nuclei results appear under category `nuclei`. If the binary is not found, a warning is printed and the rest of the dorks are returned normally.
+
+## Preflight dead-link filter
+
+```bash
+dorkhound --name "Jane Doe" --emails "jane@example.com" --preflight
+```
+
+Probes each dork whose `Query` is a direct HTTP(S) URL (HIBP, Wayback, IntelX, TrueCaller, people-db lookups, nuclei `matched-at` URLs) with an HTTP HEAD request and drops any that return 4xx/5xx or fail to connect. Search-engine-wrapped dorks (the majority) are passed through untouched — `HEAD google.com/search?q=...` always returns 200 regardless of result count, so probing them provides no useful signal.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--preflight` | `false` | Enable preflight probing |
+| `--preflight-timeout` | `5s` | Per-request timeout |
+| `--preflight-concurrency` | `8` | Max parallel probes |
+| `--preflight-rate` | `250ms` | Per-worker cooldown between requests |
+
+## Reverse image search
+
+Pass `--photo-url` with a publicly accessible image URL to generate direct reverse-image-search dorks across nine engines:
+
+```bash
+dorkhound --name "Jane Doe" --photo-url "https://example.com/jane.jpg" --category image
+```
+
+Emits direct-URL dorks for Google Lens, Google Images, Yandex (best for faces), TinEye, Bing Visual Search, PimEyes, SauceNAO, IQDB, and KarmaDecay. The operator opens each link — no credentials required. Two name-based photo-platform searches (Flickr/500px/SmugMug and Imgur) are also emitted when `--name` is set.
+
+## TraceLabs submission format
+
+Generate a Markdown checklist formatted for TraceLabs CTF flag submission:
+
+```bash
+dorkhound --name "Jane Doe" --emails "jane@example.com" --usernames "jdoe42" \
+  --photo-url "https://example.com/jane.jpg" --export tracelabs
+```
+
+Produces a `# TraceLabs Submission — <name>` document with a case header, leads grouped by category (image → username → email → phone → social → … → unknowns), and a submission workflow checklist. Pipe to a file with `--output report.md`.
+
 ## Shell Completions
 
 ```bash
