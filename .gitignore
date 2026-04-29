@@ -24,3 +24,6 @@ coverage.html
 # Environment
 .env
 .env.*
+
+# Local assistant/tooling state
+.omc/

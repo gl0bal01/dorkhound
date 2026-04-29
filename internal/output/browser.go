@@ -46,12 +46,12 @@ func openURL(rawURL string) error {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "linux":
-		cmd = exec.Command("xdg-open", rawURL)
+		cmd = exec.Command("xdg-open", rawURL) // #nosec G204 -- rawURL is validated http(s) and exec.Command does not invoke a shell.
 	case "darwin":
-		cmd = exec.Command("open", rawURL)
+		cmd = exec.Command("open", rawURL) // #nosec G204 -- rawURL is validated http(s) and exec.Command does not invoke a shell.
 	case "windows":
 		// Use rundll32 instead of cmd /c start to avoid shell metacharacter injection.
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", rawURL)
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", rawURL) // #nosec G204 -- rawURL is validated http(s) and exec.Command does not invoke a shell.
 	default:
 		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
 	}

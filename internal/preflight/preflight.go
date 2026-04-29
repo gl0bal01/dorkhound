@@ -8,8 +8,10 @@ package preflight
 
 import (
 	"context"
-	"errors"
+	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -19,10 +21,11 @@ import (
 
 // Options configures a preflight run.
 type Options struct {
-	Concurrency int           // max parallel HEAD requests (default 8)
-	Timeout     time.Duration // per-request timeout (default 5s)
-	RateLimit   time.Duration // min delay between requests per worker (default 250ms)
-	UserAgent   string        // default "dorkhound-preflight/1.0"
+	Concurrency         int           // max parallel HEAD requests (default 8)
+	Timeout             time.Duration // per-request timeout (default 5s)
+	RateLimit           time.Duration // min delay between requests per worker (default 250ms)
+	UserAgent           string        // default "dorkhound-preflight/1.0"
+	AllowPrivateNetwork bool          // allow loopback/private/link-local targets
 }
 
 // Status records the outcome of probing one dork's direct URL.
@@ -99,7 +102,7 @@ func Run(ctx context.Context, dorks []dork.Dork, opts Options) ([]dork.Dork, Rep
 		go func() {
 			defer wg.Done()
 			for j := range jobCh {
-				st := probe(ctx, client, j.d.Query, opts.UserAgent)
+				st := probe(ctx, client, j.d.Query, opts.UserAgent, opts.AllowPrivateNetwork)
 				mu.Lock()
 				statusByIdx[j.idx] = st
 				if st.Dead {
@@ -150,8 +153,13 @@ func isDirectURL(q string) bool {
 	return strings.HasPrefix(q, "http://") || strings.HasPrefix(q, "https://")
 }
 
-func probe(ctx context.Context, client *http.Client, target, ua string) Status {
+func probe(ctx context.Context, client *http.Client, target, ua string, allowPrivateNetwork bool) Status {
 	st := Status{URL: target}
+	if err := validateProbeTarget(ctx, target, allowPrivateNetwork); err != nil {
+		st.Err = err.Error()
+		st.Dead = true
+		return st
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, target, nil)
 	if err != nil {
 		st.Err = err.Error()
@@ -161,11 +169,6 @@ func probe(ctx context.Context, client *http.Client, target, ua string) Status {
 	req.Header.Set("User-Agent", ua)
 	resp, err := client.Do(req)
 	if err != nil {
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			st.Err = err.Error()
-			st.Dead = true
-			return st
-		}
 		st.Err = err.Error()
 		st.Dead = true
 		return st
@@ -185,4 +188,49 @@ func probe(ctx context.Context, client *http.Client, target, ua string) Status {
 		st.Dead = true
 	}
 	return st
+}
+
+func validateProbeTarget(ctx context.Context, target string, allowPrivateNetwork bool) error {
+	u, err := url.Parse(target)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("unsupported URL scheme: %q", u.Scheme)
+	}
+	if allowPrivateNetwork {
+		return nil
+	}
+	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
+	if host == "" {
+		return fmt.Errorf("missing URL hostname")
+	}
+	if host == "localhost" {
+		return fmt.Errorf("blocked private network target: %s", host)
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if isRestrictedIP(ip) {
+			return fmt.Errorf("blocked private network target: %s", ip.String())
+		}
+		return nil
+	}
+	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		return nil
+	}
+	for _, addr := range addrs {
+		if isRestrictedIP(addr.IP) {
+			return fmt.Errorf("blocked private network target: %s resolves to %s", host, addr.IP.String())
+		}
+	}
+	return nil
+}
+
+func isRestrictedIP(ip net.IP) bool {
+	return ip.IsLoopback() ||
+		ip.IsPrivate() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsMulticast() ||
+		ip.IsUnspecified()
 }

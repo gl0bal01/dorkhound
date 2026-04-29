@@ -194,3 +194,32 @@ func TestCSVFormat(t *testing.T) {
 		t.Errorf("row1 url missing google.com/search; got %q", row1[5])
 	}
 }
+
+func TestCSVFormulaCellsArePrefixed(t *testing.T) {
+	dorks := []dork.Dork{
+		{
+			Query:    `=IMPORTXML("https://example.com","//a")`,
+			Category: "social",
+			Region:   "global",
+			Priority: 2,
+			Label:    "@malicious",
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := CSV(&buf, dorks, "google"); err != nil {
+		t.Fatalf("CSV() returned error: %v", err)
+	}
+
+	reader := csv.NewReader(strings.NewReader(buf.String()))
+	records, err := reader.ReadAll()
+	if err != nil {
+		t.Fatalf("failed to parse CSV output: %v", err)
+	}
+	if got := records[1][0]; got != "'@malicious" {
+		t.Errorf("label = %q, want formula-prefixed value", got)
+	}
+	if got := records[1][4]; !strings.HasPrefix(got, "'=") {
+		t.Errorf("query = %q, want formula-prefixed value", got)
+	}
+}

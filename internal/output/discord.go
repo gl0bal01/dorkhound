@@ -33,18 +33,18 @@ var categoryTitles = map[string]string{
 // grouped by category in a fixed order.
 func Discord(w io.Writer, c *caseinfo.Case, dorks []dork.Dork, engine string) {
 	// Header
-	fmt.Fprintf(w, "## OSINT Results: %s\n", c.Name)
+	fmt.Fprintf(w, "## OSINT Results: %s\n", markdownText(c.Name))
 
 	// Metadata line — only include non-empty fields
 	var meta []string
 	if c.Location != "" {
-		meta = append(meta, fmt.Sprintf("**Location:** %s", c.Location))
+		meta = append(meta, fmt.Sprintf("**Location:** %s", markdownText(c.Location)))
 	}
 	if c.Age != 0 {
 		meta = append(meta, fmt.Sprintf("**Age:** ~%d", c.Age))
 	}
 	if c.DOB != "" {
-		meta = append(meta, fmt.Sprintf("**DOB:** %s", c.DOB))
+		meta = append(meta, fmt.Sprintf("**DOB:** %s", markdownText(c.DOB)))
 	}
 	if len(meta) > 0 {
 		fmt.Fprintf(w, "%s\n", strings.Join(meta, " | "))
@@ -69,7 +69,7 @@ func Discord(w io.Writer, c *caseinfo.Case, dorks []dork.Dork, engine string) {
 		}
 		fmt.Fprintf(w, "\n### %s (%d %s)\n", title, len(ds), noun)
 		for _, d := range ds {
-			fmt.Fprintf(w, "- %s: %s\n", d.Label, d.URL(engine))
+			fmt.Fprintf(w, "- %s: <%s>\n", markdownText(d.Label), neutralizeMentions(d.URL(engine)))
 		}
 	}
 }

@@ -52,7 +52,7 @@ func ParseName(fullName string) (first, last string) {
 // LoadFromFile loads a Case from a YAML (.yaml/.yml) or JSON (.json) file.
 // After loading, FirstName and LastName are derived from Name.
 func LoadFromFile(path string) (*Case, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- CLI intentionally reads an operator-supplied case file path.
 	if err != nil {
 		return nil, fmt.Errorf("reading case file: %w", err)
 	}

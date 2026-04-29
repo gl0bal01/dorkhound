@@ -55,8 +55,9 @@ func TestRun(t *testing.T) {
 	}
 
 	survivors, report := Run(context.Background(), dorks, Options{
-		Timeout:   500 * time.Millisecond,
-		RateLimit: 0,
+		Timeout:             500 * time.Millisecond,
+		RateLimit:           0,
+		AllowPrivateNetwork: true,
 	})
 
 	if report.Checked != 5 {
@@ -114,8 +115,9 @@ func TestRunSlowTimeout(t *testing.T) {
 
 	start := time.Now()
 	survivors, report := Run(context.Background(), dorks, Options{
-		Timeout:   100 * time.Millisecond,
-		RateLimit: 0,
+		Timeout:             100 * time.Millisecond,
+		RateLimit:           0,
+		AllowPrivateNetwork: true,
 	})
 	elapsed := time.Since(start)
 
@@ -145,8 +147,9 @@ func TestRunContextCancellation(t *testing.T) {
 
 	// Must not panic.
 	_, _ = Run(ctx, dorks, Options{
-		Timeout:   5 * time.Second,
-		RateLimit: 0,
+		Timeout:             5 * time.Second,
+		RateLimit:           0,
+		AllowPrivateNetwork: true,
 	})
 }
 
@@ -165,6 +168,39 @@ func TestRunNoDirectURLs(t *testing.T) {
 	}
 	if len(survivors) != 2 {
 		t.Errorf("survivors = %d, want 2", len(survivors))
+	}
+}
+
+func TestRunBlocksPrivateNetworkTargets(t *testing.T) {
+	t.Parallel()
+
+	dorks := []dork.Dork{
+		{Query: "http://127.0.0.1:8080/alive", Label: "loopback"},
+		{Query: "http://169.254.169.254/latest/meta-data/", Label: "metadata"},
+		{Query: "http://localhost:8080/alive", Label: "localhost"},
+	}
+
+	survivors, report := Run(context.Background(), dorks, Options{
+		Timeout:   100 * time.Millisecond,
+		RateLimit: 0,
+	})
+
+	if report.Checked != 3 {
+		t.Errorf("Checked = %d, want 3", report.Checked)
+	}
+	if report.Dead != 3 {
+		t.Errorf("Dead = %d, want 3", report.Dead)
+	}
+	if len(survivors) != 0 {
+		t.Errorf("survivors = %d, want 0", len(survivors))
+	}
+}
+
+func TestValidateProbeTargetAllowsPrivateWhenOptedIn(t *testing.T) {
+	t.Parallel()
+
+	if err := validateProbeTarget(context.Background(), "http://127.0.0.1:8080/alive", true); err != nil {
+		t.Fatalf("validateProbeTarget with AllowPrivateNetwork = %v, want nil", err)
 	}
 }
 

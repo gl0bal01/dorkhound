@@ -11,7 +11,24 @@
 
 dorkhound generates 340+ OSINT dork queries, direct-profile URLs, and reverse-image-search links across 25 categories to accelerate missing-person investigations and TraceLabs CTF competitions. You provide a name (and optionally emails, phones, usernames, a photo, or a full case file); dorkhound produces a ranked list of search URLs and direct endpoints you open and triage in an interactive dashboard. Single binary, zero runtime dependencies, cross-platform.
 
+dorkhound is an **investigation accelerator**, not an automated identification system. It does not verify identity, prove that a lead belongs to a subject, bypass access controls, or replace human review. Treat every result as an investigative lead that must be corroborated with source context, timestamps, screenshots, and independent evidence.
+
 > **Responsible use:** This tool is intended for authorized OSINT investigations, CTF competitions, and educational use only. Always comply with applicable laws and platform terms of service.
+
+## Status and Scope
+
+dorkhound is suitable for public CLI distribution and local operator workflows. It is not a hosted multi-user service, and it is not designed to store, process, or share cases on a server. Case files, notes, exports, browser history, clipboard contents, and downloaded evidence remain the operator's responsibility.
+
+Use dorkhound when you need to quickly build a structured search plan from known identifiers. Do not use it to harass, stalk, dox, make automated eligibility decisions, or publish unverified allegations.
+
+## Safety Model
+
+- **Local-first:** The dashboard binds to `127.0.0.1` on a random port and an unguessable path. It serves only the local browser session.
+- **Private by default:** Dashboard notes use session storage by default. Use "Persist state" only on a trusted machine and browser profile.
+- **Explicit exports:** Export files are created with owner-only permissions and are not overwritten unless `--force-output` is passed.
+- **Safer paste output:** Markdown exports neutralize Discord mentions and escape user-controlled text. CSV exports protect against spreadsheet formula execution.
+- **Network guardrails:** Preflight probes skip search-query dorks and block private, loopback, link-local, and metadata-style targets by default.
+- **Supply-chain hygiene:** CI and release workflows pin GitHub Actions by commit SHA, use reduced token permissions, and release checksums are generated for binary artifacts.
 
 ## Install
 
@@ -45,16 +62,42 @@ dorkhound --case examples/full.yaml --dashboard
 dorkhound --case case.yaml --export tracelabs -o submission.md
 ```
 
+If the output file already exists, dorkhound exits instead of overwriting it. Pass `--force-output` only when replacing the file is intentional.
+
 ## TraceLabs CTF Workflow
 
 1. **Receive the brief** — organizers provide name, approximate age, last-known location, and a photo URL.
 2. **Populate a case file** — copy `examples/tracelabs.yaml`, fill in the four fields, save as `case.yaml`.
 3. **Launch the dashboard** — `dorkhound --case case.yaml --dashboard`. A local web UI opens in your browser.
-4. **Triage** — use the filter bar to focus on high-signal categories (image, username, direct-profile). The dashboard persists notes and evidence fields in localStorage between sessions.
+4. **Triage** — use the filter bar to focus on high-signal categories (image, username, direct-profile). The dashboard keeps notes in session storage by default; enable "Persist state" only on a trusted browser.
 5. **Pivot** — as you discover new handles, emails, or phone numbers, add them to `case.yaml` and re-run. Each new identifier significantly expands the dork corpus.
 6. **Export** — `dorkhound --case case.yaml --export tracelabs -o submission.md` produces a checklist formatted for TraceLabs flag submission.
 
 The dashboard's "Open batch" button opens URLs in rate-limited groups to avoid search-engine CAPTCHAs (configurable with `--batch` and `--batch-pause`).
+
+## Operational Guidance
+
+Good OSINT work is slower than link collection. Use dorkhound to find places to look, then record why each lead is relevant.
+
+Recommended workflow:
+
+1. Start with the minimum known identifiers from an authorized brief.
+2. Open high-priority categories first: image, username, direct-profile, email, phone, and official registries.
+3. Mark false positives and dead ends aggressively; common names produce noise.
+4. Capture source URLs, screenshots, timestamps, and the exact observed facts before drawing conclusions.
+5. Add newly corroborated identifiers back into the case file and re-run.
+6. Keep case files, exports, screenshots, and browser profiles secured when working with sensitive personal data.
+
+Do not submit or share a lead solely because dorkhound generated it. A generated query is not evidence.
+
+## Limitations
+
+- Search engine results vary by region, account state, personalization, rate limits, and time.
+- Direct-profile URLs can exist for unrelated people using the same handle.
+- People-search sites may be inaccurate, stale, paywalled, jurisdiction-specific, or legally restricted.
+- Reverse-image search results can be weak for cropped, compressed, edited, or AI-generated images.
+- Nuclei results depend on the installed binary, templates, network conditions, and platform changes.
+- Preflight only checks whether direct URLs respond; it does not validate that a page contains relevant evidence.
 
 ## Features
 
@@ -68,7 +111,7 @@ The dashboard's "Open batch" button opens URLs in rate-limited groups to avoid s
 - Missing-person registries: NamUs, CharleyProject, DoeNetwork, NCMEC (US), MissingPeople (UK), Interpol notices
 - Nuclei v2 integration: username enumeration across 600+ sites via `-tags osint`
 - Preflight HTTP checker: HEAD-probes direct-URL dorks and drops dead links before operator triage
-- Interactive dashboard with localStorage state persistence, per-result notes and evidence fields, filter bar, rate-limited "Open batch", keyboard shortcuts
+- Interactive localhost dashboard with per-session notes by default, optional trusted-browser persistence, per-result evidence fields, filter bar, rate-limited "Open batch", keyboard shortcuts
 - TraceLabs submission format export
 - Export formats: discord, json, csv, clipboard, tracelabs
 - Region filters for US, CA, UK, AU, RU, FR, DE, AT, NL
@@ -90,6 +133,7 @@ Run `dorkhound --help` for the full flag reference. The most commonly used flags
 | `--location` / `-l` | Last known location |
 | `--dashboard` | Serve local web dashboard with notes & filters |
 | `--export` | Output format: discord, json, csv, clipboard, tracelabs |
+| `--force-output` | Overwrite an existing `--output` file |
 | `--category` | Category filter (see `--list-categories`) |
 | `--region` | Region filter (see `--list-regions`) |
 | `--open` | Open all URLs in default browser |
@@ -134,7 +178,9 @@ Nuclei probes 600+ sites for each username and appends results under category `n
 
 ## Preflight Dead-Link Filter
 
-Probes each dork whose query is a direct HTTP(S) URL (people-db lookups, Wayback, HIBP, nuclei matched-at URLs, etc.) with an HTTP HEAD request and drops any that return 4xx/5xx or fail to connect. Search-engine-wrapped dorks are passed through untouched — probing `google.com/search?q=...` always returns 200 regardless of result count.
+Probes each dork whose query is a direct public HTTP(S) URL (people-db lookups, Wayback, HIBP, nuclei matched-at URLs, etc.) with an HTTP HEAD request and drops any that return 4xx/5xx or fail to connect. Search-engine-wrapped dorks are passed through untouched — probing `google.com/search?q=...` always returns 200 regardless of result count.
+
+Preflight blocks private, loopback, link-local, and metadata-style targets by default. This prevents accidental probing of local services or cloud metadata endpoints if a future direct URL source produces an unsafe target.
 
 ```bash
 dorkhound --name "Jane Doe" --emails "jane@example.com" --preflight
@@ -180,6 +226,8 @@ Produces a `# TraceLabs Submission — <name>` Markdown document with a case hea
 
 ## Export Formats
 
+Exports may contain sensitive personal data. Store them in an appropriate case folder, avoid pasting raw exports into public channels, and review all generated content before submission.
+
 | Format | Description |
 |--------|-------------|
 | `discord` | Markdown grouped by category, ready to paste into Discord |
@@ -187,6 +235,8 @@ Produces a `# TraceLabs Submission — <name>` Markdown document with a case hea
 | `csv` | Columns: label, category, region, priority, query, url |
 | `clipboard` | Discord format copied to system clipboard |
 | `tracelabs` | TraceLabs CTF submission checklist |
+
+Markdown exports escape user-controlled text and neutralize Discord mentions. CSV exports prefix formula-like cells so spreadsheet software does not execute them as formulas.
 
 ## Shell Completion
 

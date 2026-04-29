@@ -20,6 +20,15 @@ import (
 
 var version = "dev"
 
+var knownCategories = []string{
+	"all", "social", "records", "financial", "location", "forums", "people-db",
+	"email", "phone", "username", "cache", "documents", "dating", "marketplace",
+	"nuclei", "image", "gravatar", "github", "academic", "direct-profile",
+	"twitter", "reddit", "fundraiser", "telegram", "vehicle", "crypto",
+}
+
+var knownRegions = []string{"all", "global", "us", "ca", "uk", "au", "ru", "fr", "de", "at", "nl"}
+
 func main() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -52,6 +61,7 @@ func run(cmd *cobra.Command, args []string) error {
 	flagDashboard, _ := cmd.Flags().GetBool("dashboard")
 	flagExport, _ := cmd.Flags().GetString("export")
 	flagOutput, _ := cmd.Flags().GetString("output")
+	flagForceOutput, _ := cmd.Flags().GetBool("force-output")
 
 	flagCategory, _ := cmd.Flags().GetString("category")
 	flagRegion, _ := cmd.Flags().GetString("region")
@@ -75,18 +85,14 @@ func run(cmd *cobra.Command, args []string) error {
 	flagListRegions, _ := cmd.Flags().GetBool("list-regions")
 
 	if flagListCategories {
-		cats := []string{"all", "social", "records", "financial", "location", "forums", "people-db",
-			"email", "phone", "username", "cache", "documents", "dating", "marketplace",
-			"nuclei", "image", "gravatar", "github", "academic", "direct-profile"}
-		for _, c := range cats {
+		for _, c := range knownCategories {
 			fmt.Println(c)
 		}
 		return nil
 	}
 
 	if flagListRegions {
-		regions := []string{"all", "global", "us", "ca", "uk", "au", "ru", "fr", "de", "at", "nl"}
-		for _, r := range regions {
+		for _, r := range knownRegions {
 			fmt.Println(r)
 		}
 		return nil
@@ -200,7 +206,7 @@ func run(cmd *cobra.Command, args []string) error {
 	// Output writer: default to os.Stdout; if --output is set, create file.
 	var w io.Writer = os.Stdout
 	if flagOutput != "" {
-		f, err := os.Create(flagOutput)
+		f, err := createOutputFile(flagOutput, flagForceOutput)
 		if err != nil {
 			return fmt.Errorf("creating output file: %w", err)
 		}
@@ -309,6 +315,7 @@ func init() {
 	rootCmd.Flags().Bool("dashboard", false, "Serve local web dashboard")
 	rootCmd.Flags().String("export", "", "Export format: discord, json, csv, clipboard, tracelabs")
 	rootCmd.Flags().StringP("output", "o", "", "Write export to file instead of stdout")
+	rootCmd.Flags().Bool("force-output", false, "Overwrite --output if it already exists")
 
 	// Filter flags
 	rootCmd.Flags().String("category", "all", "Category filter; use --list-categories for choices")
@@ -347,11 +354,8 @@ func init() {
 		values []string
 	}{
 		{"engine", []string{"google", "bing", "duckduckgo", "yandex"}},
-		{"region", []string{"global", "all", "us", "ca", "uk", "au", "ru", "fr", "de", "at", "nl"}},
-		{"category", []string{"all", "social", "records", "financial", "location", "forums", "people-db",
-			"email", "phone", "username", "cache", "documents", "dating", "marketplace",
-			"nuclei", "image", "gravatar", "github", "academic", "direct-profile",
-			"twitter", "reddit", "fundraiser", "telegram", "vehicle", "crypto"}},
+		{"region", knownRegions},
+		{"category", knownCategories},
 		{"export", []string{"discord", "json", "csv", "clipboard", "tracelabs"}},
 	} {
 		values := reg.values
@@ -361,4 +365,19 @@ func init() {
 			panic(fmt.Sprintf("registering completion for --%s: %v", reg.flag, err))
 		}
 	}
+}
+
+func createOutputFile(path string, force bool) (*os.File, error) {
+	flags := os.O_WRONLY | os.O_CREATE | os.O_EXCL
+	if force {
+		flags = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+	}
+	f, err := os.OpenFile(path, flags, 0600) // #nosec G304 -- CLI intentionally writes an operator-supplied output path.
+	if err != nil {
+		if os.IsExist(err) && !force {
+			return nil, fmt.Errorf("%s already exists; pass --force-output to overwrite", path)
+		}
+		return nil, err
+	}
+	return f, nil
 }

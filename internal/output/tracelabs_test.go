@@ -39,7 +39,7 @@ func TestTraceLabs_Basic(t *testing.T) {
 	if !strings.Contains(out, "### records (1)") {
 		t.Errorf("missing records category heading; got:\n%s", out)
 	}
-	if !strings.Contains(out, "- [ ] Google Lens reverse search — https://lens.google.com/uploadbyurl?url=X") {
+	if !strings.Contains(out, "- [ ] Google Lens reverse search — <https://lens.google.com/uploadbyurl?url=X>") {
 		t.Errorf("missing image dork checkbox line; got:\n%s", out)
 	}
 	if !strings.Contains(out, "- [ ] Twitter search —") {

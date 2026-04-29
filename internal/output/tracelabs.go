@@ -23,7 +23,7 @@ var traceLabsCategoryOrder = []string{
 // pasted into the TraceLabs submission UI or a team scratchpad.
 func TraceLabs(w io.Writer, c *caseinfo.Case, dorks []dork.Dork, engine string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
-	fmt.Fprintf(w, "# TraceLabs Submission — %s\n", c.Name)
+	fmt.Fprintf(w, "# TraceLabs Submission — %s\n", markdownText(c.Name))
 	fmt.Fprintf(w, "Generated: %s\n\n", now)
 
 	fmt.Fprintln(w, "## Case")
@@ -86,16 +86,16 @@ func TraceLabs(w io.Writer, c *caseinfo.Case, dorks []dork.Dork, engine string) 
 				}
 				return ds[i].Label < ds[j].Label
 			})
-			fmt.Fprintf(w, "\n### %s (%d)\n", cat, len(ds))
+			fmt.Fprintf(w, "\n### %s (%d)\n", markdownText(cat), len(ds))
 			for _, d := range ds {
-				fmt.Fprintf(w, "- [ ] %s — %s\n", d.Label, d.URL(engine))
+				fmt.Fprintf(w, "- [ ] %s — <%s>\n", markdownText(d.Label), neutralizeMentions(d.URL(engine)))
 			}
 		}
 	}
 
 	fmt.Fprintln(w, "\n## Notes")
 	if c.Description != "" {
-		fmt.Fprintln(w, c.Description)
+		fmt.Fprintln(w, markdownText(c.Description))
 		fmt.Fprintln(w)
 	}
 
@@ -112,5 +112,5 @@ func tlField(w io.Writer, label, value string) {
 	if value == "" {
 		return
 	}
-	fmt.Fprintf(w, "- **%s:** %s\n", label, value)
+	fmt.Fprintf(w, "- **%s:** %s\n", markdownText(label), markdownText(value))
 }

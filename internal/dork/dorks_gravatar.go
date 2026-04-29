@@ -1,7 +1,7 @@
 package dork
 
 import (
-	"crypto/md5"
+	"crypto/md5" // #nosec G501 -- Gravatar requires MD5 of the normalized email address.
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -19,7 +19,7 @@ func generateGravatarDorks(c *caseinfo.Case) []Dork {
 	}
 	var dorks []Dork
 	for _, email := range c.Emails {
-		h := md5.Sum([]byte(strings.ToLower(strings.TrimSpace(email))))
+		h := md5.Sum([]byte(strings.ToLower(strings.TrimSpace(email)))) // #nosec G401 -- Gravatar requires MD5 for lookup URLs.
 		hash := hex.EncodeToString(h[:])
 		dorks = append(dorks,
 			Dork{

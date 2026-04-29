@@ -1,6 +1,10 @@
 package output
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -20,6 +24,7 @@ type dashboardData struct {
 }
 
 type dashboardCase struct {
+	ID       string `json:"id"`
 	Name     string `json:"name"`
 	Location string `json:"location"`
 	Age      int    `json:"age"`
@@ -50,6 +55,7 @@ func ServeDashboard(c *caseinfo.Case, dorks []dork.Dork, engine string, htmlTemp
 
 	blob := dashboardData{
 		CaseInfo: dashboardCase{
+			ID:       dashboardCaseID(c),
 			Name:     c.Name,
 			Location: c.Location,
 			Age:      c.Age,
@@ -63,8 +69,18 @@ func ServeDashboard(c *caseinfo.Case, dorks []dork.Dork, engine string, htmlTemp
 		return fmt.Errorf("marshalling dashboard data: %w", err)
 	}
 
+	token, err := randomURLToken()
+	if err != nil {
+		return fmt.Errorf("generating dashboard token: %w", err)
+	}
+	nonce, err := randomCSPNonce()
+	if err != nil {
+		return fmt.Errorf("generating CSP nonce: %w", err)
+	}
+
 	// Replace the placeholder in the HTML template with actual data.
 	html := strings.Replace(htmlTemplate, "/*DATA_PLACEHOLDER*/{}", string(jsonBytes), 1)
+	html = strings.ReplaceAll(html, "CSP_NONCE", nonce)
 
 	// Listen on a random available port on localhost.
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -73,21 +89,25 @@ func ServeDashboard(c *caseinfo.Case, dorks []dork.Dork, engine string, htmlTemp
 	}
 
 	addr := listener.Addr().(*net.TCPAddr)
-	url := fmt.Sprintf("http://127.0.0.1:%d", addr.Port)
+	dashboardPath := "/" + token
+	url := fmt.Sprintf("http://127.0.0.1:%d%s", addr.Port, dashboardPath)
 
 	// Use a dedicated mux instead of http.DefaultServeMux to avoid
 	// route pollution from imported packages.
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Only serve the exact root path.
-		if r.URL.Path != "/" {
+		// Only serve the unguessable dashboard path.
+		if r.URL.Path != dashboardPath {
 			http.NotFound(w, r)
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'")
+		csp := fmt.Sprintf("default-src 'self'; script-src 'nonce-%s'; style-src 'nonce-%s'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'", nonce, nonce)
+		w.Header().Set("Content-Security-Policy", csp)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
 		w.Header().Set("Cache-Control", "no-store")
 		fmt.Fprint(w, html)
 	})
@@ -106,4 +126,29 @@ func ServeDashboard(c *caseinfo.Case, dorks []dork.Dork, engine string, htmlTemp
 		IdleTimeout:       120 * time.Second,
 	}
 	return srv.Serve(listener)
+}
+
+func randomURLToken() (string, error) {
+	var b [18]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b[:]), nil
+}
+
+func randomCSPNonce() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return base64.RawStdEncoding.EncodeToString(b[:]), nil
+}
+
+func dashboardCaseID(c *caseinfo.Case) string {
+	sum := sha256.Sum256([]byte(strings.Join([]string{
+		strings.TrimSpace(c.Name),
+		strings.TrimSpace(c.DOB),
+		strings.TrimSpace(c.Location),
+	}, "\x00")))
+	return hex.EncodeToString(sum[:16])
 }

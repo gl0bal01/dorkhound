@@ -19,12 +19,12 @@ func CSV(w io.Writer, dorks []dork.Dork, engine string) error {
 
 	for _, d := range dorks {
 		row := []string{
-			d.Label,
-			d.Category,
-			d.Region,
+			csvCell(d.Label),
+			csvCell(d.Category),
+			csvCell(d.Region),
 			fmt.Sprintf("%d", d.Priority),
-			d.Query,
-			d.URL(engine),
+			csvCell(d.Query),
+			csvCell(d.URL(engine)),
 		}
 		if err := cw.Write(row); err != nil {
 			return fmt.Errorf("writing CSV row: %w", err)

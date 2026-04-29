@@ -82,3 +82,42 @@ func TestCLI_RegionFilter(t *testing.T) {
 		t.Error("us region should include Spokeo")
 	}
 }
+
+func TestCreateOutputFileExclusiveByDefault(t *testing.T) {
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "submission.md")
+	if err := os.WriteFile(outPath, []byte("existing"), 0600); err != nil {
+		t.Fatalf("write existing output: %v", err)
+	}
+
+	f, err := createOutputFile(outPath, false)
+	if err == nil {
+		f.Close()
+		t.Fatal("createOutputFile without force should fail for existing path")
+	}
+
+	got, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("read existing output: %v", err)
+	}
+	if string(got) != "existing" {
+		t.Fatalf("existing output was modified: %q", got)
+	}
+}
+
+func TestCreateOutputFileForceOverwrites(t *testing.T) {
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "submission.md")
+	if err := os.WriteFile(outPath, []byte("existing"), 0600); err != nil {
+		t.Fatalf("write existing output: %v", err)
+	}
+
+	f, err := createOutputFile(outPath, true)
+	if err != nil {
+		t.Fatalf("createOutputFile with force: %v", err)
+	}
+	defer f.Close()
+	if _, err := f.WriteString("new"); err != nil {
+		t.Fatalf("write output: %v", err)
+	}
+}

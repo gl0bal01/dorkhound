@@ -138,6 +138,35 @@ func TestDiscordMetadataPartialFields(t *testing.T) {
 	}
 }
 
+func TestDiscordEscapesMarkdownAndMentions(t *testing.T) {
+	c := &caseinfo.Case{
+		Name:     "@everyone [Jane](https://evil.example)",
+		Location: "A|B",
+	}
+	dorks := []dork.Dork{
+		{
+			Query:    "https://example.com/@everyone",
+			Category: "social",
+			Region:   "global",
+			Priority: 2,
+			Label:    "*bold* <@123>",
+		},
+	}
+
+	var buf bytes.Buffer
+	Discord(&buf, c, dorks, "google")
+	out := buf.String()
+
+	if strings.Contains(out, "@everyone") || strings.Contains(out, "<@123>") {
+		t.Fatalf("output still contains active mention:\n%s", out)
+	}
+	for _, want := range []string{"@\u200beveryone", "\\[Jane\\]", "A\\|B", "\\*bold\\*", "<@\u200b123\\>"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing escaped value %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestStdoutFormat(t *testing.T) {
 	dorks := []dork.Dork{
 		{

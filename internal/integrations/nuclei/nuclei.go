@@ -85,7 +85,7 @@ func runOne(ctx context.Context, username, tags string, timeout time.Duration) (
 		"-silent",
 		"-duc",
 	}
-	cmd := exec.CommandContext(cctx, "nuclei", args...)
+	cmd := exec.CommandContext(cctx, "nuclei", args...) // #nosec G204 -- arguments are passed without a shell; username is a nuclei variable value.
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

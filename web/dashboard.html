@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DORK Dashboard</title>
-<style>
+<style nonce="CSP_NONCE">
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:#0d1117;color:#c9d1d9;font-size:13px;line-height:1.4;padding:16px;max-width:1280px;margin:0 auto}
 h1{color:#58a6ff;font-size:1.4rem;margin-bottom:4px}
@@ -48,6 +48,7 @@ textarea{background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius
 .dropdown-menu-label{font-size:0.78rem;color:#8b949e;padding:2px 6px 6px;display:block}
 .menu-radio-label,.menu-check-label{display:flex;align-items:center;gap:6px;padding:4px 6px;cursor:pointer;border-radius:4px;color:#c9d1d9;font-size:0.85rem}
 .menu-radio-label:hover,.menu-check-label:hover{background:#21262d}
+.persist-toggle{display:inline-flex;border:1px solid #30363d;border-radius:6px;padding:5px 10px}
 .menu-divider{border:none;border-top:1px solid #30363d;margin:6px 0}
 .menu-actions{display:flex;gap:6px;margin-top:8px}
 .batch-progress{font-size:0.8rem;color:#8b949e;margin-top:6px}
@@ -89,6 +90,7 @@ textarea{background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius
 .overlay.open{display:flex}
 .overlay-box{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:24px 28px;max-width:480px;width:100%}
 .overlay-box h2{margin-bottom:14px}
+.help-close{margin-top:14px}
 .shortcut-table{width:100%;border-collapse:collapse;font-size:0.85rem}
 .shortcut-table td{padding:4px 8px;border-bottom:1px solid #21262d}
 .shortcut-table td:first-child{color:#58a6ff;font-family:monospace;font-weight:600;width:60px}
@@ -107,13 +109,13 @@ textarea{background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius
     <table class="shortcut-table" aria-label="Keyboard shortcuts reference">
       <tbody id="shortcut-tbody"></tbody>
     </table>
-    <button class="btn btn-sm" style="margin-top:14px" id="help-close-btn" aria-label="Close help overlay">Close</button>
+    <button class="btn btn-sm help-close" id="help-close-btn" aria-label="Close help overlay">Close</button>
   </div>
 </div>
 
 <input type="file" id="import-file" accept=".json" aria-label="Import state JSON file">
 
-<script>
+<script nonce="CSP_NONCE">
 "use strict";
 
 const data = /*DATA_PLACEHOLDER*/{};
@@ -148,14 +150,33 @@ let batchCursor = 0;
 let lastToastTime = 0;
 let toastTimer = null;
 
-const storageKey = () =>
-  "dorkhound:state:" + ((data.case_info && data.case_info.name) ? data.case_info.name : "unknown");
+const caseID = () =>
+  (data.case_info && data.case_info.id) ? data.case_info.id : "unknown";
+const storageKey = () => "dorkhound:state:" + caseID();
+const persistKey = () => "dorkhound:persist:" + caseID();
+
+function storageBackend() {
+  try {
+    return localStorage.getItem(persistKey()) === "1" ? localStorage : sessionStorage;
+  } catch (e) {
+    return sessionStorage;
+  }
+}
+
+function persistenceEnabled() {
+  try {
+    return localStorage.getItem(persistKey()) === "1";
+  } catch (e) {
+    return false;
+  }
+}
 
 // ─── LocalStorage ─────────────────────────────────────────────────────────────
 
 function loadState() {
   try {
-    const raw = localStorage.getItem(storageKey());
+    const key = storageKey();
+    const raw = storageBackend().getItem(key) || localStorage.getItem(key) || sessionStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && parsed.version === 1 && parsed.links && typeof parsed.links === "object") {
@@ -168,7 +189,7 @@ function loadState() {
 const saveStateDebounced = debounce(function () {
   state.updatedAt = new Date().toISOString();
   try {
-    localStorage.setItem(storageKey(), JSON.stringify(state));
+    storageBackend().setItem(storageKey(), JSON.stringify(state));
   } catch (e) {
     showToast("Storage full — could not save", "err");
     return;
@@ -261,6 +282,21 @@ function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; 
 function caseName() {
   const n = (data.case_info && data.case_info.name) ? data.case_info.name : "case";
   return n.replace(/\s+/g, "-").toLowerCase();
+}
+
+function neutralizeMentions(s) {
+  return String(s || "")
+    .replace(/@everyone/g, "@\u200beveryone")
+    .replace(/@here/g, "@\u200bhere")
+    .replace(/<@&/g, "<@\u200b&")
+    .replace(/<@/g, "<@\u200b");
+}
+
+function markdownText(s) {
+  return neutralizeMentions(String(s || "")
+    .replace(/[\r\n]+/g, " ")
+    .replace(/\\/g, "\\\\")
+    .replace(/([`*_{}\[\]()#+!|>])/g, "\\$1"));
 }
 
 // ─── Group + ID assignment ────────────────────────────────────────────────────
@@ -540,11 +576,39 @@ function buildToolbar(container) {
   importBtn.addEventListener("click", () => document.getElementById("import-file").click());
   toolbar.appendChild(importBtn);
 
+  const persistLbl = mk("label", { class: "menu-check-label persist-toggle" });
+  const persistInp = mk("input", { type: "checkbox", id: "persist-state" });
+  persistInp.checked = persistenceEnabled();
+  persistLbl.appendChild(persistInp);
+  persistLbl.appendChild(txt(" Persist state"));
+  persistInp.addEventListener("change", () => {
+    const key = storageKey();
+    try {
+      if (persistInp.checked) {
+        localStorage.setItem(persistKey(), "1");
+        localStorage.setItem(key, JSON.stringify(state));
+        sessionStorage.removeItem(key);
+        showToast("Persistence enabled");
+      } else {
+        localStorage.removeItem(persistKey());
+        localStorage.removeItem(key);
+        sessionStorage.setItem(key, JSON.stringify(state));
+        showToast("Using session storage");
+      }
+    } catch (e) {
+      persistInp.checked = false;
+      showToast("Could not change persistence", "err");
+    }
+  });
+  toolbar.appendChild(persistLbl);
+
   const clearBtn = mk("button", { class: "btn btn-danger", "aria-label": "Clear all saved state for this case" });
   clearBtn.textContent = "Clear state";
   clearBtn.addEventListener("click", () => {
     if (confirm("Clear all saved state for this case? This cannot be undone.")) {
       localStorage.removeItem(storageKey());
+      sessionStorage.removeItem(storageKey());
+      localStorage.removeItem(persistKey());
       state = { version: 1, updatedAt: "", links: {} };
       location.reload();
     }
@@ -905,15 +969,15 @@ function buildExport(menuEl) {
 
   if (fmt === "tracelabs") {
     const lines = [
-      "# TraceLabs Submission \u2014 " + (ci.name || "Unknown"),
+      "# TraceLabs Submission \u2014 " + markdownText(ci.name || "Unknown"),
       "Generated: " + new Date().toISOString(),
       "",
       "## Case",
     ];
-    if (ci.name)     lines.push("- **Name:** " + ci.name);
-    if (ci.location) lines.push("- **Location:** " + ci.location);
+    if (ci.name)     lines.push("- **Name:** " + markdownText(ci.name));
+    if (ci.location) lines.push("- **Location:** " + markdownText(ci.location));
     if (ci.age)      lines.push("- **Age:** ~" + ci.age);
-    if (ci.dob)      lines.push("- **DOB:** " + ci.dob);
+    if (ci.dob)      lines.push("- **DOB:** " + markdownText(ci.dob));
     lines.push("", "## Leads by Category");
     for (const cat of orderedCats) {
       const items = groups[cat];
@@ -924,12 +988,12 @@ function buildExport(menuEl) {
         return ls.status === "pending" || ls.status === "useful";
       });
       if (!relevant.length) continue;
-      lines.push("", "### " + capitalize(cat) + " (" + relevant.length + ")");
+      lines.push("", "### " + markdownText(capitalize(cat)) + " (" + relevant.length + ")");
       for (const item of relevant) {
         const ls = getLinkState(item.id);
-        lines.push("- [ ] " + item.label + " \u2014 " + item.url);
-        if (ls.notes && ls.notes.trim()) lines.push("  - Notes: " + ls.notes.trim());
-        if (ls.evidence && ls.evidence.trim()) lines.push("  - Evidence: " + ls.evidence.trim());
+        lines.push("- [ ] " + markdownText(item.label) + " \u2014 <" + neutralizeMentions(item.url) + ">");
+        if (ls.notes && ls.notes.trim()) lines.push("  - Notes: " + markdownText(ls.notes.trim()));
+        if (ls.evidence && ls.evidence.trim()) lines.push("  - Evidence: " + markdownText(ls.evidence.trim()));
       }
     }
     lines.push(
@@ -943,11 +1007,11 @@ function buildExport(menuEl) {
   }
 
   // Discord markdown
-  const lines = ["## OSINT Results: " + (ci.name || "Unknown")];
+  const lines = ["## OSINT Results: " + markdownText(ci.name || "Unknown")];
   const meta = [];
-  if (ci.location) meta.push("**Location:** " + ci.location);
+  if (ci.location) meta.push("**Location:** " + markdownText(ci.location));
   if (ci.age)      meta.push("**Age:** ~" + ci.age);
-  if (ci.dob)      meta.push("**DOB:** " + ci.dob);
+  if (ci.dob)      meta.push("**DOB:** " + markdownText(ci.dob));
   if (meta.length) lines.push(meta.join(" | "));
   for (const cat of orderedCats) {
     const items = groups[cat];
@@ -958,12 +1022,12 @@ function buildExport(menuEl) {
       return ls.status === "pending" || ls.status === "useful";
     });
     if (!included.length) continue;
-    lines.push("", "### " + capitalize(cat) + " (" + included.length + " links)");
+    lines.push("", "### " + markdownText(capitalize(cat)) + " (" + included.length + " links)");
     for (const item of included) {
       const ls = getLinkState(item.id);
-      let line = "- " + item.label + ": <" + item.url + ">";
-      if (ls.notes && ls.notes.trim()) line += "\n  > " + ls.notes.trim();
-      if (ls.evidence && ls.evidence.trim()) line += "\n  > Evidence: " + ls.evidence.trim();
+      let line = "- " + markdownText(item.label) + ": <" + neutralizeMentions(item.url) + ">";
+      if (ls.notes && ls.notes.trim()) line += "\n  > " + markdownText(ls.notes.trim());
+      if (ls.evidence && ls.evidence.trim()) line += "\n  > Evidence: " + markdownText(ls.evidence.trim());
       lines.push(line);
     }
   }
