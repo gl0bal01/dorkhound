@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gl0bal01/dorkhound/internal/caseinfo"
+	"github.com/gl0bal01/dorkhound/internal/category"
 	"github.com/gl0bal01/dorkhound/internal/dork"
 	"github.com/gl0bal01/dorkhound/internal/integrations/nuclei"
 	"github.com/gl0bal01/dorkhound/internal/interactive"
@@ -20,14 +21,12 @@ import (
 
 var version = "dev"
 
-var knownCategories = []string{
-	"all", "social", "records", "financial", "location", "forums", "people-db",
-	"email", "phone", "username", "cache", "documents", "dating", "marketplace",
-	"nuclei", "image", "gravatar", "github", "academic", "direct-profile",
-	"twitter", "reddit", "fundraiser", "telegram", "vehicle", "crypto",
-}
+// knownCategories is sourced from the category catalog with "all" prepended.
+var knownCategories = category.AllSlugs()
 
 var knownRegions = []string{"all", "global", "us", "ca", "uk", "au", "ru", "fr", "de", "at", "nl"}
+
+var knownEngines = []string{"google", "bing", "duckduckgo", "yandex"}
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
@@ -156,6 +155,33 @@ func run(cmd *cobra.Command, args []string) error {
 		if strings.TrimSpace(c.Name) == "" {
 			return fmt.Errorf("name is required: use --name or --case")
 		}
+
+		// Apply case-file values for region/categories/engine when the matching
+		// CLI flag was left at its default. Explicit CLI flags always win.
+		if !cmd.Flags().Changed("region") && c.Region != "" {
+			flagRegion = c.Region
+		}
+		if !cmd.Flags().Changed("category") && len(c.Categories) > 0 {
+			flagCategory = strings.Join(c.Categories, ",")
+		}
+		if !cmd.Flags().Changed("engine") && c.Engine != "" {
+			flagEngine = c.Engine
+		}
+	}
+
+	// Validate filter inputs early so typos like --category usernames or
+	// --engine googel surface clearly instead of silently producing 0 dorks.
+	if err := validateCategories(flagCategory); err != nil {
+		return err
+	}
+	if err := validateRegions(flagRegion); err != nil {
+		return err
+	}
+	if err := validateEngine(flagEngine); err != nil {
+		return err
+	}
+	if flagNuclei && flagNucleiTimeout <= 0 {
+		return fmt.Errorf("--nuclei-timeout must be positive (got %s)", flagNucleiTimeout)
 	}
 
 	allDorks := dork.Generate(c)
@@ -185,8 +211,8 @@ func run(cmd *cobra.Command, args []string) error {
 			Timeout:     flagPreflightTimeout,
 			RateLimit:   flagPreflightRate,
 		})
-		fmt.Fprintf(os.Stderr, "preflight: %d checked, %d alive, %d dead (%d search dorks skipped)\n",
-			preflightReport.Checked, preflightReport.Alive, preflightReport.Dead, preflightReport.Skipped)
+		fmt.Fprintf(os.Stderr, "preflight: %d checked, %d alive, %d dead, %d unchecked (%d search dorks skipped)\n",
+			preflightReport.Checked, preflightReport.Alive, preflightReport.Dead, preflightReport.Unchecked, preflightReport.Skipped)
 		sorted = survivors
 	}
 
@@ -216,6 +242,8 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Open URLs in browser if requested.
 	if flagOpen {
+		fmt.Fprintf(os.Stderr, "Opening %d URLs in default browser (delay=%dms, batch=%d, batch-pause=%s)\n",
+			len(sorted), flagDelay, flagBatch, flagBatchPause)
 		output.OpenInBrowser(sorted, engine, time.Duration(flagDelay)*time.Millisecond, flagBatchPause, flagBatch)
 	}
 
@@ -353,7 +381,7 @@ func init() {
 		flag   string
 		values []string
 	}{
-		{"engine", []string{"google", "bing", "duckduckgo", "yandex"}},
+		{"engine", knownEngines},
 		{"region", knownRegions},
 		{"category", knownCategories},
 		{"export", []string{"discord", "json", "csv", "clipboard", "tracelabs"}},
@@ -365,6 +393,43 @@ func init() {
 			panic(fmt.Sprintf("registering completion for --%s: %v", reg.flag, err))
 		}
 	}
+}
+
+// validateCategories rejects unknown category names with a helpful message
+// listing valid choices. Empty strings and "all" pass through.
+func validateCategories(raw string) error {
+	for _, c := range caseinfo.SplitTrim(raw) {
+		if !category.IsKnown(c) {
+			return fmt.Errorf("unknown category %q: see --list-categories for valid choices", c)
+		}
+	}
+	return nil
+}
+
+func validateRegions(raw string) error {
+	allowed := make(map[string]bool, len(knownRegions))
+	for _, r := range knownRegions {
+		allowed[r] = true
+	}
+	for _, r := range caseinfo.SplitTrim(raw) {
+		if !allowed[r] {
+			return fmt.Errorf("unknown region %q: see --list-regions for valid choices", r)
+		}
+	}
+	return nil
+}
+
+func validateEngine(raw string) error {
+	e := strings.ToLower(strings.TrimSpace(raw))
+	if e == "" {
+		return nil
+	}
+	for _, k := range knownEngines {
+		if e == k {
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown engine %q: valid choices are %s", raw, strings.Join(knownEngines, ", "))
 }
 
 func createOutputFile(path string, force bool) (*os.File, error) {
