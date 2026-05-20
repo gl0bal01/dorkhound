@@ -122,10 +122,13 @@ const data = /*DATA_PLACEHOLDER*/{};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+// Mirror of internal/category.Catalog order. Unknown categories are appended
+// alphabetically after these so a new category never silently disappears.
 const CATEGORY_ORDER = [
   "image","username","direct-profile","email","phone","gravatar","github",
   "social","people-db","nuclei","cache","records","academic","documents",
-  "forums","financial","location","dating","marketplace","other"
+  "forums","financial","location","dating","marketplace","twitter","reddit",
+  "fundraiser","telegram","vehicle","crypto","other"
 ];
 
 const SHORTCUTS = [
@@ -303,14 +306,18 @@ function markdownText(s) {
 
 function buildGroups(results) {
   const g = {};
+  let fallbackIdx = 0;
   for (const r of results) {
     const cat = r.category || "other";
     if (!g[cat]) g[cat] = [];
-    g[cat].push({ label: r.label, url: r.url, category: cat, id: makeLinkId(cat, r.url) });
+    const id = r.id || makeLinkId(cat, r.label + "\x00" + r.url + "\x00" + fallbackIdx);
+    fallbackIdx++;
+    g[cat].push({ label: r.label, url: r.url, category: cat, id });
   }
   const ordered = {};
   for (const c of CATEGORY_ORDER) { if (g[c]) ordered[c] = g[c]; }
-  for (const c of Object.keys(g)) { if (!ordered[c]) ordered[c] = g[c]; }
+  const extras = Object.keys(g).filter(c => !ordered[c]).sort();
+  for (const c of extras) { ordered[c] = g[c]; }
   return ordered;
 }
 

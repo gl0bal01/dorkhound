@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/gl0bal01/dorkhound/internal/caseinfo"
+	"github.com/gl0bal01/dorkhound/internal/category"
 )
 
 // Result holds the gathered information from the interactive prompts.
@@ -22,7 +23,7 @@ type Result struct {
 func Run() (*Result, error) {
 	var name, location, age, dob string
 	var aka, associates, description string
-	var engine, category string
+	var engine, categoryFlag string
 	var regions []string
 	var openBrowser bool
 
@@ -88,30 +89,7 @@ func Run() (*Result, error) {
 					huh.NewOption("All regions", "all"),
 				).Value(&regions),
 			huh.NewSelect[string]().Title("Category filter").
-				Options(
-					huh.NewOption("All categories", "all"),
-					huh.NewOption("Social media", "social"),
-					huh.NewOption("Public records", "records"),
-					huh.NewOption("Financial", "financial"),
-					huh.NewOption("Location", "location"),
-					huh.NewOption("Forums", "forums"),
-					huh.NewOption("People databases", "people-db"),
-					huh.NewOption("Email", "email"),
-					huh.NewOption("Phone", "phone"),
-					huh.NewOption("Username", "username"),
-					huh.NewOption("Cache/Archive", "cache"),
-					huh.NewOption("Documents", "documents"),
-					huh.NewOption("Dating", "dating"),
-					huh.NewOption("Marketplace", "marketplace"),
-					huh.NewOption("Nuclei results", "nuclei"),
-					huh.NewOption("Image/reverse search", "image"),
-					huh.NewOption("Twitter/X", "twitter"),
-					huh.NewOption("Reddit", "reddit"),
-					huh.NewOption("Fundraiser/Memorial", "fundraiser"),
-					huh.NewOption("Telegram", "telegram"),
-					huh.NewOption("Vehicle", "vehicle"),
-					huh.NewOption("Crypto", "crypto"),
-				).Value(&category),
+				Options(categoryOptions()...).Value(&categoryFlag),
 			huh.NewConfirm().Title("Open results in browser?").Value(&openBrowser),
 		),
 	).Run()
@@ -157,7 +135,17 @@ func Run() (*Result, error) {
 		Case:        c,
 		Engine:      engine,
 		Region:      regionStr,
-		Category:    category,
+		Category:    categoryFlag,
 		OpenBrowser: openBrowser,
 	}, nil
+}
+
+// categoryOptions builds the interactive category selector from the shared
+// catalog so new categories surface automatically here.
+func categoryOptions() []huh.Option[string] {
+	opts := []huh.Option[string]{huh.NewOption("All categories", "all")}
+	for _, e := range category.Catalog {
+		opts = append(opts, huh.NewOption(e.Title, e.Slug))
+	}
+	return opts
 }

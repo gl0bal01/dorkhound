@@ -6,31 +6,14 @@ import (
 	"strings"
 
 	"github.com/gl0bal01/dorkhound/internal/caseinfo"
+	"github.com/gl0bal01/dorkhound/internal/category"
 	"github.com/gl0bal01/dorkhound/internal/dork"
 )
 
-// categoryOrder defines the display order for Discord output.
-var categoryOrder = []string{
-	"social",
-	"records",
-	"financial",
-	"location",
-	"forums",
-	"people-db",
-}
-
-// categoryTitles maps category slugs to display titles.
-var categoryTitles = map[string]string{
-	"social":    "Social",
-	"records":   "Records",
-	"financial": "Financial",
-	"location":  "Location",
-	"forums":    "Forums",
-	"people-db": "People-DB",
-}
-
 // Discord writes dorks to w in Discord-flavored Markdown format,
-// grouped by category in a fixed order.
+// grouped by category. Known categories are emitted in catalog order;
+// any unknown categories are appended alphabetically so a new category
+// added to the engine flows through without code changes here.
 func Discord(w io.Writer, c *caseinfo.Case, dorks []dork.Dork, engine string) {
 	// Header
 	fmt.Fprintf(w, "## OSINT Results: %s\n", markdownText(c.Name))
@@ -50,28 +33,44 @@ func Discord(w io.Writer, c *caseinfo.Case, dorks []dork.Dork, engine string) {
 		fmt.Fprintf(w, "%s\n", strings.Join(meta, " | "))
 	}
 
-	// Group dorks by category
+	// Group dorks by category.
 	groups := groupByCategory(dorks)
+	if len(groups) == 0 {
+		return
+	}
 
-	// Output in fixed category order
-	for _, cat := range categoryOrder {
-		ds, ok := groups[cat]
-		if !ok || len(ds) == 0 {
+	present := make([]string, 0, len(groups))
+	for cat := range groups {
+		present = append(present, cat)
+	}
+	titles := category.Titles()
+
+	for _, cat := range category.OrderForExport(present) {
+		ds := groups[cat]
+		if len(ds) == 0 {
 			continue
 		}
-		title := categoryTitles[cat]
+		title := titles[cat]
 		if title == "" {
-			title = cat
+			title = capitalizeSlug(cat)
 		}
 		noun := "links"
 		if len(ds) == 1 {
 			noun = "link"
 		}
-		fmt.Fprintf(w, "\n### %s (%d %s)\n", title, len(ds), noun)
+		fmt.Fprintf(w, "\n### %s (%d %s)\n", markdownText(title), len(ds), noun)
 		for _, d := range ds {
 			fmt.Fprintf(w, "- %s: <%s>\n", markdownText(d.Label), neutralizeMentions(d.URL(engine)))
 		}
 	}
+}
+
+// capitalizeSlug uppercases the first ASCII letter of a slug for display.
+func capitalizeSlug(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
 
 // groupByCategory groups a slice of dorks into a map keyed by Category.

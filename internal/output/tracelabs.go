@@ -8,15 +8,9 @@ import (
 	"time"
 
 	"github.com/gl0bal01/dorkhound/internal/caseinfo"
+	"github.com/gl0bal01/dorkhound/internal/category"
 	"github.com/gl0bal01/dorkhound/internal/dork"
 )
-
-// tracелабsCategoryOrder defines the preferred display order for TraceLabs submission.
-var traceLabsCategoryOrder = []string{
-	"image", "username", "email", "phone", "social", "people-db",
-	"nuclei", "cache", "records", "documents", "forums", "financial",
-	"location", "dating", "marketplace",
-}
 
 // TraceLabs writes a Markdown submission draft grouped by category, with
 // each dork as a checkbox line: "- [ ] <label> — <url>". Intended to be
@@ -51,26 +45,15 @@ func TraceLabs(w io.Writer, c *caseinfo.Case, dorks []dork.Dork, engine string) 
 	}
 	tlField(w, "Photo", c.PhotoSearchURL())
 
-	// Group dorks by category.
+	// Group dorks by category. Ordering uses the shared catalog so all
+	// exports surface categories in the same priority and a new category
+	// flows through here without code changes.
 	groups := groupByCategory(dorks)
-
-	// Build ordered category list: known order first, then unknowns alphabetically.
-	var orderedCats []string
-	seen := make(map[string]bool)
-	for _, cat := range traceLabsCategoryOrder {
-		if _, ok := groups[cat]; ok {
-			orderedCats = append(orderedCats, cat)
-			seen[cat] = true
-		}
-	}
-	var extra []string
+	present := make([]string, 0, len(groups))
 	for cat := range groups {
-		if !seen[cat] {
-			extra = append(extra, cat)
-		}
+		present = append(present, cat)
 	}
-	sort.Strings(extra)
-	orderedCats = append(orderedCats, extra...)
+	orderedCats := category.OrderForExport(present)
 
 	if len(orderedCats) > 0 {
 		fmt.Fprintln(w, "\n## Leads by Category")
