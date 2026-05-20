@@ -61,13 +61,18 @@ func generatePhoneDorks(c *caseinfo.Case) []Dork {
 		}
 
 		if digits != "" {
+			// TrueCaller path takes an ISO-3166 alpha-2 country code segment.
+			// Derive it from the phone's country prefix when possible so a
+			// French number does not get a /us/ path. Falls back to "us"
+			// only when no recognized prefix is present.
+			country := truecallerCountry(digits, c.Region)
 			dorks = append(dorks,
 				Dork{
-					Query:    fmt.Sprintf("https://www.truecaller.com/search/us/%s", digits),
+					Query:    fmt.Sprintf("https://www.truecaller.com/search/%s/%s", country, digits),
 					Category: "phone",
 					Region:   "global",
 					Priority: 3,
-					Label:    "TrueCaller lookup",
+					Label:    fmt.Sprintf("TrueCaller lookup (%s)", country),
 				},
 				Dork{
 					Query:    fmt.Sprintf("https://www.whocalled.us/lookup/%s", digits),
@@ -80,6 +85,31 @@ func generatePhoneDorks(c *caseinfo.Case) []Dork {
 		}
 	}
 	return dorks
+}
+
+// truecallerCountry maps the most common country dialing prefixes to the
+// alpha-2 codes TrueCaller uses in its /search/<country>/<digits> path.
+// caseRegion (from the case file) is used as a fallback before defaulting
+// to "us".
+func truecallerCountry(digits, caseRegion string) string {
+	prefixes := []struct {
+		prefix  string
+		country string
+	}{
+		{"1", "us"}, {"33", "fr"}, {"34", "es"}, {"39", "it"},
+		{"44", "uk"}, {"49", "de"}, {"43", "at"}, {"31", "nl"},
+		{"7", "ru"}, {"61", "au"}, {"64", "nz"}, {"55", "br"},
+		{"86", "cn"}, {"81", "jp"}, {"82", "kr"}, {"91", "in"},
+	}
+	for _, p := range prefixes {
+		if len(digits) > len(p.prefix) && digits[:len(p.prefix)] == p.prefix {
+			return p.country
+		}
+	}
+	if caseRegion != "" && caseRegion != "global" && caseRegion != "all" {
+		return caseRegion
+	}
+	return "us"
 }
 
 func digitsOnly(s string) string {

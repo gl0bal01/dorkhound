@@ -15,16 +15,18 @@ func generateUsernameDorks(c *caseinfo.Case) []Dork {
 		return nil
 	}
 
+	// Sites are matched against high-priority set by raw key so dual-host
+	// entries like reddit/twitter mirrors are also boosted.
 	highPrioritySites := map[string]bool{
-		"github.com":                true,
-		"gitlab.com":                true,
-		"reddit.com":                true,
-		"twitter.com OR site:x.com": true,
-		"instagram.com":             true,
-		"tiktok.com":                true,
-		"youtube.com":               true,
-		"steamcommunity.com":        true,
-		"keybase.io":                true,
+		"github.com":                        true,
+		"gitlab.com":                        true,
+		"reddit.com OR site:old.reddit.com": true,
+		"twitter.com OR site:x.com":         true,
+		"instagram.com":                     true,
+		"tiktok.com":                        true,
+		"youtube.com":                       true,
+		"steamcommunity.com":                true,
+		"keybase.io":                        true,
 	}
 
 	sites := []struct {

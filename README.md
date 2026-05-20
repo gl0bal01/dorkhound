@@ -152,9 +152,9 @@ Run `dorkhound --help` for the full flag reference. The most commonly used flags
 | `/` | Focus filter bar |
 | `Esc` | Clear filter |
 | `j` / `k` | Next / previous result |
-| `x` | Mark current result reviewed |
-| `d` | Open current URL in browser |
-| `n` | Edit note for current result |
+| `x` | Toggle current result between pending and useful |
+| `d` | Mark current result as a dead end |
+| `n` | Toggle the notes panel for the current result |
 | `?` | Show help overlay |
 
 ## Nuclei Integration
