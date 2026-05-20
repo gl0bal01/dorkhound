@@ -34,21 +34,24 @@ type Status struct {
 	StatusCode int    // HTTP status code; 0 if request failed
 	Err        string // non-empty on transport/TLS/timeout errors
 	Dead       bool   // true if the dork should be dropped (4xx/5xx or error)
+	Unchecked  bool   // true if probe was aborted by context cancellation
 }
 
 // Report summarizes a preflight pass.
 type Report struct {
-	Checked int // how many dorks were actually probed (direct URLs only)
-	Skipped int // search-engine dorks passed through
-	Alive   int
-	Dead    int
-	Results []Status // one entry per alive checked dork, in input order
+	Checked   int // how many dorks were actually probed (direct URLs only)
+	Skipped   int // search-engine dorks passed through
+	Alive     int
+	Dead      int
+	Unchecked int      // direct-URL probes that were aborted (e.g. ctx cancel)
+	Results   []Status // one entry per alive checked dork, in input order
 }
 
 // Run probes the direct-URL dorks and returns (survivors, report).
 // Search-query dorks are always preserved. Direct-URL dorks are dropped when
-// HEAD returns 4xx/5xx or transport errors. On context cancellation, all
-// pending probes are aborted and partial results returned.
+// HEAD returns 4xx/5xx or transport errors. On context cancellation any
+// direct URL that did not complete is preserved in survivors and counted in
+// report.Unchecked, so the operator can tell which leads were not validated.
 func Run(ctx context.Context, dorks []dork.Dork, opts Options) ([]dork.Dork, Report) {
 	if opts.Concurrency <= 0 {
 		opts.Concurrency = 8
@@ -63,8 +66,22 @@ func Run(ctx context.Context, dorks []dork.Dork, opts Options) ([]dork.Dork, Rep
 		opts.UserAgent = "dorkhound-preflight/1.0"
 	}
 
+	// Custom transport whose DialContext re-validates the resolved IP at
+	// connect time. This closes the check-then-use gap where a DNS-
+	// rebinding attacker could pass validation and resolve to a private IP
+	// at dial time.
+	baseDialer := &net.Dialer{Timeout: opts.Timeout}
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return dialValidated(ctx, baseDialer, network, addr, opts.AllowPrivateNetwork)
+		},
+		TLSHandshakeTimeout:   opts.Timeout,
+		ResponseHeaderTimeout: opts.Timeout,
+		DisableKeepAlives:     true,
+	}
 	client := &http.Client{
-		Timeout: opts.Timeout,
+		Timeout:   opts.Timeout,
+		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
@@ -80,9 +97,11 @@ func Run(ctx context.Context, dorks []dork.Dork, opts Options) ([]dork.Dork, Rep
 	statusByIdx := make(map[int]Status)
 
 	var jobs []job
+	directIdx := make(map[int]bool)
 	for i, d := range dorks {
 		if isDirectURL(d.Query) {
 			jobs = append(jobs, job{i, d})
+			directIdx[i] = true
 			report.Checked++
 		} else {
 			report.Skipped++
@@ -139,9 +158,14 @@ func Run(ctx context.Context, dorks []dork.Dork, opts Options) ([]dork.Dork, Rep
 			report.Dead++
 			continue
 		}
-		if st, ok := statusByIdx[i]; ok {
-			report.Alive++
-			report.Results = append(report.Results, st)
+		if directIdx[i] {
+			if st, ok := statusByIdx[i]; ok {
+				report.Alive++
+				report.Results = append(report.Results, st)
+			} else {
+				report.Unchecked++
+				report.Results = append(report.Results, Status{URL: d.Query, Unchecked: true})
+			}
 		}
 		survivors = append(survivors, d)
 	}
@@ -224,6 +248,45 @@ func validateProbeTarget(ctx context.Context, target string, allowPrivateNetwork
 		}
 	}
 	return nil
+}
+
+// dialValidated wraps the dialer with a second IP check at connect time.
+// This closes the DNS-rebinding gap where validateProbeTarget resolves
+// safely but the transport's later resolution returns a private IP.
+func dialValidated(ctx context.Context, dialer *net.Dialer, network, addr string, allowPrivateNetwork bool) (net.Conn, error) {
+	if allowPrivateNetwork {
+		return dialer.DialContext(ctx, network, addr)
+	}
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if isRestrictedIP(ip) {
+			return nil, fmt.Errorf("blocked private network target at dial: %s", ip.String())
+		}
+		return dialer.DialContext(ctx, network, addr)
+	}
+	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+	for _, ip := range addrs {
+		if isRestrictedIP(ip.IP) {
+			return nil, fmt.Errorf("blocked private network target at dial: %s resolves to %s", host, ip.IP.String())
+		}
+	}
+	// Dial the first resolved IP to keep the validated address. This trades
+	// resilience against multi-homed first-IP failures for TOCTOU-safe SSRF
+	// guarantees; the host resolution is intentionally not retried.
+	if len(addrs) == 0 {
+		return nil, fmt.Errorf("no IPs resolved for %s", host)
+	}
+	first := addrs[0].IP.String()
+	if strings.Contains(first, ":") {
+		first = "[" + first + "]"
+	}
+	return dialer.DialContext(ctx, network, net.JoinHostPort(first, port))
 }
 
 func isRestrictedIP(ip net.IP) bool {

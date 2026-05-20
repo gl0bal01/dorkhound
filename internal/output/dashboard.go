@@ -32,6 +32,7 @@ type dashboardCase struct {
 }
 
 type dashboardResult struct {
+	ID       string `json:"id"`
 	Label    string `json:"label"`
 	URL      string `json:"url"`
 	Category string `json:"category"`
@@ -41,12 +42,16 @@ type dashboardResult struct {
 
 // ServeDashboard starts a local HTTP server serving an interactive dashboard.
 func ServeDashboard(c *caseinfo.Case, dorks []dork.Dork, engine string, htmlTemplate string) error {
-	// Build JSON data blob.
+	// Build JSON data blob. Each row gets a collision-resistant ID derived
+	// from category + label + URL + position so duplicate search-engine
+	// URL prefixes never collide in the DOM.
 	results := make([]dashboardResult, len(dorks))
 	for i, d := range dorks {
+		url := d.URL(engine)
 		results[i] = dashboardResult{
+			ID:       dashboardRowID(d.Category, d.Label, url, i),
 			Label:    d.Label,
-			URL:      d.URL(engine),
+			URL:      url,
 			Category: d.Category,
 			Region:   d.Region,
 			Priority: d.Priority,
@@ -142,6 +147,40 @@ func randomCSPNonce() (string, error) {
 		return "", err
 	}
 	return base64.RawStdEncoding.EncodeToString(b[:]), nil
+}
+
+// dashboardRowID returns a stable, collision-resistant ID for a dashboard
+// row. The category prefix is sanitized so a slug containing characters
+// invalid in CSS selectors (`:`, `.`, space) can never break querySelector
+// calls in the dashboard JS.
+func dashboardRowID(category, label, url string, index int) string {
+	sum := sha256.Sum256([]byte(strings.Join([]string{
+		category,
+		label,
+		url,
+		fmt.Sprintf("%d", index),
+	}, "\x00")))
+	return sanitizeIDPrefix(category) + ":" + hex.EncodeToString(sum[:12])
+}
+
+// sanitizeIDPrefix replaces every byte outside [A-Za-z0-9_-] with '_' so
+// the prefix is safe to use in DOM IDs and CSS selectors.
+func sanitizeIDPrefix(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9', c == '-', c == '_':
+			b.WriteByte(c)
+		default:
+			b.WriteByte('_')
+		}
+	}
+	if b.Len() == 0 {
+		return "cat"
+	}
+	return b.String()
 }
 
 func dashboardCaseID(c *caseinfo.Case) string {
