@@ -211,8 +211,8 @@ func run(cmd *cobra.Command, args []string) error {
 			Timeout:     flagPreflightTimeout,
 			RateLimit:   flagPreflightRate,
 		})
-		fmt.Fprintf(os.Stderr, "preflight: %d checked, %d alive, %d dead, %d unchecked (%d search dorks skipped)\n",
-			preflightReport.Checked, preflightReport.Alive, preflightReport.Dead, preflightReport.Unchecked, preflightReport.Skipped)
+		fmt.Fprintf(os.Stderr, "preflight: %d checked, %d alive, %d dead, %d blocked, %d unchecked (%d search dorks skipped)\n",
+			preflightReport.Checked, preflightReport.Alive, preflightReport.Dead, preflightReport.Blocked, preflightReport.Unchecked, preflightReport.Skipped)
 		sorted = survivors
 	}
 
@@ -269,13 +269,20 @@ func run(cmd *cobra.Command, args []string) error {
 		if err := output.TraceLabs(w, c, sorted, engine); err != nil {
 			return fmt.Errorf("writing TraceLabs: %w", err)
 		}
+	case "casebandit":
+		if err := output.CaseBandit(w, c, sorted, output.CaseBanditExportOptions{
+			Version: version,
+			Engine:  engine,
+		}); err != nil {
+			return fmt.Errorf("writing CaseBandit: %w", err)
+		}
 	case "":
 		// Default: print to stdout (unless --open was the only action).
 		if !flagOpen {
 			output.Stdout(w, sorted, engine)
 		}
 	default:
-		return fmt.Errorf("unknown export format %q: use discord, json, csv, clipboard, or tracelabs", exportFormat)
+		return fmt.Errorf("unknown export format %q: use discord, json, csv, clipboard, tracelabs, or casebandit", exportFormat)
 	}
 
 	return nil
@@ -341,7 +348,7 @@ func init() {
 	// Output flags
 	rootCmd.Flags().Bool("open", false, "Open all URLs in default browser")
 	rootCmd.Flags().Bool("dashboard", false, "Serve local web dashboard")
-	rootCmd.Flags().String("export", "", "Export format: discord, json, csv, clipboard, tracelabs")
+	rootCmd.Flags().String("export", "", "Export format: discord, json, csv, clipboard, tracelabs, casebandit")
 	rootCmd.Flags().StringP("output", "o", "", "Write export to file instead of stdout")
 	rootCmd.Flags().Bool("force-output", false, "Overwrite --output if it already exists")
 
@@ -384,7 +391,7 @@ func init() {
 		{"engine", knownEngines},
 		{"region", knownRegions},
 		{"category", knownCategories},
-		{"export", []string{"discord", "json", "csv", "clipboard", "tracelabs"}},
+		{"export", []string{"discord", "json", "csv", "clipboard", "tracelabs", "casebandit"}},
 	} {
 		values := reg.values
 		if err := rootCmd.RegisterFlagCompletionFunc(reg.flag, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

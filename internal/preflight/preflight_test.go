@@ -188,11 +188,21 @@ func TestRunBlocksPrivateNetworkTargets(t *testing.T) {
 	if report.Checked != 3 {
 		t.Errorf("Checked = %d, want 3", report.Checked)
 	}
-	if report.Dead != 3 {
-		t.Errorf("Dead = %d, want 3", report.Dead)
+	// SSRF-refused targets must be Blocked, not Dead, so operators can tell
+	// "site refused with 404" apart from "we never let the dial happen".
+	if report.Blocked != 3 {
+		t.Errorf("Blocked = %d, want 3", report.Blocked)
+	}
+	if report.Dead != 0 {
+		t.Errorf("Dead = %d, want 0 (SSRF refusals must be Blocked, not Dead)", report.Dead)
 	}
 	if len(survivors) != 0 {
 		t.Errorf("survivors = %d, want 0", len(survivors))
+	}
+	for _, st := range report.Results {
+		if !st.Blocked {
+			t.Errorf("Status.Blocked = false for %s, want true", st.URL)
+		}
 	}
 }
 

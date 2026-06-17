@@ -28,13 +28,15 @@ type Options struct {
 	AllowPrivateNetwork bool          // allow loopback/private/link-local targets
 }
 
-// Status records the outcome of probing one dork's direct URL.
+// Status records the outcome of probing one dork's direct URL. Exactly one of
+// Alive/Dead/Blocked/Unchecked is true for any given Status.
 type Status struct {
 	URL        string
 	StatusCode int    // HTTP status code; 0 if request failed
 	Err        string // non-empty on transport/TLS/timeout errors
-	Dead       bool   // true if the dork should be dropped (4xx/5xx or error)
-	Unchecked  bool   // true if probe was aborted by context cancellation
+	Dead       bool   // 4xx/5xx response or transport/DNS/TLS error
+	Blocked    bool   // SSRF guard refused (private/loopback/link-local target)
+	Unchecked  bool   // probe was aborted before completion (e.g. ctx cancel)
 }
 
 // Report summarizes a preflight pass.
@@ -43,8 +45,9 @@ type Report struct {
 	Skipped   int // search-engine dorks passed through
 	Alive     int
 	Dead      int
-	Unchecked int      // direct-URL probes that were aborted (e.g. ctx cancel)
-	Results   []Status // one entry per alive checked dork, in input order
+	Blocked   int      // SSRF guard refused target
+	Unchecked int      // probe aborted before completion
+	Results   []Status // one entry per checked dork, in input order
 }
 
 // Run probes the direct-URL dorks and returns (survivors, report).
@@ -93,7 +96,6 @@ func Run(ctx context.Context, dorks []dork.Dork, opts Options) ([]dork.Dork, Rep
 	}
 
 	var report Report
-	deadSet := make(map[int]bool)
 	statusByIdx := make(map[int]Status)
 
 	var jobs []job
@@ -124,9 +126,6 @@ func Run(ctx context.Context, dorks []dork.Dork, opts Options) ([]dork.Dork, Rep
 				st := probe(ctx, client, j.d.Query, opts.UserAgent, opts.AllowPrivateNetwork)
 				mu.Lock()
 				statusByIdx[j.idx] = st
-				if st.Dead {
-					deadSet[j.idx] = true
-				}
 				mu.Unlock()
 				if opts.RateLimit > 0 {
 					select {
@@ -154,20 +153,33 @@ func Run(ctx context.Context, dorks []dork.Dork, opts Options) ([]dork.Dork, Rep
 
 	survivors := make([]dork.Dork, 0, len(dorks))
 	for i, d := range dorks {
-		if deadSet[i] {
-			report.Dead++
+		if !directIdx[i] {
+			survivors = append(survivors, d)
 			continue
 		}
-		if directIdx[i] {
-			if st, ok := statusByIdx[i]; ok {
-				report.Alive++
-				report.Results = append(report.Results, st)
-			} else {
-				report.Unchecked++
-				report.Results = append(report.Results, Status{URL: d.Query, Unchecked: true})
-			}
+		st, ok := statusByIdx[i]
+		if !ok {
+			// Probe never completed (context canceled before scheduling).
+			// Preserve the dork as unchecked so the operator can see the lead
+			// was not validated, rather than silently dropping it.
+			report.Unchecked++
+			report.Results = append(report.Results, Status{URL: d.Query, Unchecked: true})
+			survivors = append(survivors, d)
+			continue
 		}
-		survivors = append(survivors, d)
+		report.Results = append(report.Results, st)
+		switch {
+		case st.Blocked:
+			report.Blocked++
+		case st.Dead:
+			report.Dead++
+		case st.Unchecked:
+			report.Unchecked++
+			survivors = append(survivors, d)
+		default:
+			report.Alive++
+			survivors = append(survivors, d)
+		}
 	}
 
 	return survivors, report
@@ -177,11 +189,19 @@ func isDirectURL(q string) bool {
 	return strings.HasPrefix(q, "http://") || strings.HasPrefix(q, "https://")
 }
 
+// errBlockedTarget marks dial-time SSRF refusals so probe() can classify them
+// as Blocked rather than Dead.
+const errBlockedTarget = "blocked private network target"
+
 func probe(ctx context.Context, client *http.Client, target, ua string, allowPrivateNetwork bool) Status {
 	st := Status{URL: target}
 	if err := validateProbeTarget(ctx, target, allowPrivateNetwork); err != nil {
 		st.Err = err.Error()
-		st.Dead = true
+		if strings.Contains(err.Error(), errBlockedTarget) {
+			st.Blocked = true
+		} else {
+			st.Dead = true
+		}
 		return st
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, target, nil)
@@ -194,7 +214,13 @@ func probe(ctx context.Context, client *http.Client, target, ua string, allowPri
 	resp, err := client.Do(req)
 	if err != nil {
 		st.Err = err.Error()
-		st.Dead = true
+		// Distinguish dial-time SSRF refusals from generic transport failures
+		// so the operator sees Blocked separately from Dead.
+		if strings.Contains(err.Error(), errBlockedTarget) {
+			st.Blocked = true
+		} else {
+			st.Dead = true
+		}
 		return st
 	}
 	defer resp.Body.Close()
@@ -230,11 +256,11 @@ func validateProbeTarget(ctx context.Context, target string, allowPrivateNetwork
 		return fmt.Errorf("missing URL hostname")
 	}
 	if host == "localhost" {
-		return fmt.Errorf("blocked private network target: %s", host)
+		return fmt.Errorf("%s: %s", errBlockedTarget, host)
 	}
 	if ip := net.ParseIP(host); ip != nil {
 		if isRestrictedIP(ip) {
-			return fmt.Errorf("blocked private network target: %s", ip.String())
+			return fmt.Errorf("%s: %s", errBlockedTarget, ip.String())
 		}
 		return nil
 	}
@@ -244,7 +270,7 @@ func validateProbeTarget(ctx context.Context, target string, allowPrivateNetwork
 	}
 	for _, addr := range addrs {
 		if isRestrictedIP(addr.IP) {
-			return fmt.Errorf("blocked private network target: %s resolves to %s", host, addr.IP.String())
+			return fmt.Errorf("%s: %s resolves to %s", errBlockedTarget, host, addr.IP.String())
 		}
 	}
 	return nil
@@ -263,7 +289,7 @@ func dialValidated(ctx context.Context, dialer *net.Dialer, network, addr string
 	}
 	if ip := net.ParseIP(host); ip != nil {
 		if isRestrictedIP(ip) {
-			return nil, fmt.Errorf("blocked private network target at dial: %s", ip.String())
+			return nil, fmt.Errorf("%s at dial: %s", errBlockedTarget, ip.String())
 		}
 		return dialer.DialContext(ctx, network, addr)
 	}
@@ -273,7 +299,7 @@ func dialValidated(ctx context.Context, dialer *net.Dialer, network, addr string
 	}
 	for _, ip := range addrs {
 		if isRestrictedIP(ip.IP) {
-			return nil, fmt.Errorf("blocked private network target at dial: %s resolves to %s", host, ip.IP.String())
+			return nil, fmt.Errorf("%s at dial: %s resolves to %s", errBlockedTarget, host, ip.IP.String())
 		}
 	}
 	// Dial the first resolved IP to keep the validated address. This trades
