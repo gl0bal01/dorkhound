@@ -30,9 +30,9 @@ func TestCaseBanditExport_SchemaShape(t *testing.T) {
 
 	var buf bytes.Buffer
 	err := CaseBandit(&buf, c, dorks, CaseBanditExportOptions{
-		Version: "test-1.0.0",
-		Engine:  "google",
-		Now:     time.Date(2026, 5, 27, 10, 0, 0, 0, time.UTC),
+		Version:     "test-1.0.0",
+		Engine:      "google",
+		GeneratedAt: time.Date(2026, 5, 27, 10, 0, 0, 0, time.UTC),
 	})
 	if err != nil {
 		t.Fatalf("CaseBandit: %v", err)
@@ -126,9 +126,9 @@ func TestCaseBanditExport_StableIDs(t *testing.T) {
 		{Query: `"Jane Doe"`, Category: "social", Region: "global", Priority: 3, Label: "exact"},
 	}
 	opts := CaseBanditExportOptions{
-		Version: "v1",
-		Engine:  "google",
-		Now:     time.Date(2026, 5, 27, 10, 0, 0, 0, time.UTC),
+		Version:     "v1",
+		Engine:      "google",
+		GeneratedAt: time.Date(2026, 5, 27, 10, 0, 0, 0, time.UTC),
 	}
 
 	var bufA, bufB bytes.Buffer

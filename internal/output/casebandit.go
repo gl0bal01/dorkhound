@@ -91,9 +91,8 @@ type cbCaptureBody struct {
 // CaseBanditExportOptions configures the export. Zero-value is valid.
 type CaseBanditExportOptions struct {
 	Version     string    // dorkhound version string; "dev" if empty
-	Now         time.Time // injectable clock for deterministic tests
-	Engine      string    // search engine selected for this run
-	GeneratedAt time.Time
+	Engine      string    // search engine; "google" if empty
+	GeneratedAt time.Time // timestamp stamped on the doc; time.Now().UTC() if zero
 }
 
 // CaseBandit writes a v1 bridge document to w.
@@ -101,11 +100,8 @@ func CaseBandit(w io.Writer, c *caseinfo.Case, dorks []dork.Dork, opts CaseBandi
 	if opts.Version == "" {
 		opts.Version = "dev"
 	}
-	if opts.Now.IsZero() {
-		opts.Now = time.Now().UTC()
-	}
 	if opts.GeneratedAt.IsZero() {
-		opts.GeneratedAt = opts.Now
+		opts.GeneratedAt = time.Now().UTC()
 	}
 	if opts.Engine == "" {
 		opts.Engine = "google"
@@ -135,7 +131,7 @@ func CaseBandit(w io.Writer, c *caseinfo.Case, dorks []dork.Dork, opts CaseBandi
 			Description: c.Description,
 			Tags:        []string{"dorkhound", "imported"},
 			Status:      "active",
-			Notes:       buildCaseNotes(c),
+			Notes:       c.Description,
 		},
 		Entities: entities,
 		Captures: captures,
@@ -293,23 +289,6 @@ func appendUnique(s []string, v string) []string {
 		}
 	}
 	return append(s, v)
-}
-
-func buildCaseNotes(c *caseinfo.Case) string {
-	var b strings.Builder
-	b.WriteString("## Scope\n\n")
-	b.WriteString("Imported from dorkhound — auto-generated lead set.\n\n")
-	b.WriteString("## Objectives\n\n")
-	if strings.TrimSpace(c.Description) != "" {
-		b.WriteString(c.Description)
-		b.WriteString("\n\n")
-	} else {
-		b.WriteString("Triage generated dorks, confirm identifiers, capture evidence.\n\n")
-	}
-	b.WriteString("## Open Questions\n\n")
-	b.WriteString("- Which identifiers are corroborated by multiple independent sources?\n")
-	b.WriteString("- Which dead-end leads can be archived?\n")
-	return b.String()
 }
 
 // cbCaseID produces a stable case ID derived from name/dob/location so reruns
