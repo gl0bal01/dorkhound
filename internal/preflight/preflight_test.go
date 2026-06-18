@@ -200,8 +200,8 @@ func TestRunBlocksPrivateNetworkTargets(t *testing.T) {
 		t.Errorf("survivors = %d, want 0", len(survivors))
 	}
 	for _, st := range report.Results {
-		if !st.Blocked {
-			t.Errorf("Status.Blocked = false for %s, want true", st.URL)
+		if !st.Blocked() {
+			t.Errorf("Status.Blocked() = false for %s, want true", st.URL)
 		}
 	}
 }

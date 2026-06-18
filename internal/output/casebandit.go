@@ -7,11 +7,9 @@
 package output
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"io"
-	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -19,15 +17,35 @@ import (
 	"github.com/gl0bal01/dorkhound/internal/dork"
 )
 
-// minLinkableLabel is the floor for entity-label substring matching against
-// capture content. Labels shorter than this (e.g. "JD") would create too many
-// incidental cross-links inside URLs and English prose. Two-character labels
-// are still emitted as entities — they just aren't auto-linked to captures.
+// minLinkableLabel is the floor for entity-label matching against capture
+// content. Labels shorter than this (e.g. "JD") would create too many
+// incidental cross-links. Two-character labels are still emitted as
+// entities — they just aren't auto-linked to captures.
 const minLinkableLabel = 3
 
 // caseBanditSchemaVersion is the wire-format slug. Bump on incompatible
 // changes — see docs/casebandit-bridge.md "Versioning".
 const caseBanditSchemaVersion = "dorkhound-casebandit-v1"
+
+// Entity type slugs mirroring CaseBandit's ENTITY_TYPES tuple in
+// shared/types.ts. Keep this block in sync with that tuple — a wire-format
+// drift here silently breaks CaseBandit's importer. The Go side currently
+// emits a subset (no organization/ip/hash/credential/other) — those are
+// reserved for future producers.
+const (
+	entTypePerson   = "person"
+	entTypeUsername = "username"
+	entTypeURL      = "url"
+	entTypeEmail    = "email"
+	entTypePhone    = "phone"
+	entTypeLocation = "location"
+)
+
+// Capture/Entity status slugs mirroring CaseBandit's EntityStatus.
+const entStatusUnconfirmed = "unconfirmed"
+
+// Case status slug.
+const caseStatusActive = "active"
 
 type cbDocument struct {
 	SchemaVersion string      `json:"schema_version"`
@@ -130,7 +148,7 @@ func CaseBandit(w io.Writer, c *caseinfo.Case, dorks []dork.Dork, opts CaseBandi
 			Name:        c.Name,
 			Description: c.Description,
 			Tags:        []string{"dorkhound", "imported"},
-			Status:      "active",
+			Status:      caseStatusActive,
 			Notes:       c.Description,
 		},
 		Entities: entities,
@@ -145,6 +163,15 @@ func CaseBandit(w io.Writer, c *caseinfo.Case, dorks []dork.Dork, opts CaseBandi
 func buildEntities(c *caseinfo.Case, caseID string) []cbEntity {
 	var entities []cbEntity
 	seen := make(map[string]bool)
+	name := strings.TrimSpace(c.Name)
+
+	aliasNote := func(kind string) string {
+		if name != "" {
+			return kind + " of " + name
+		}
+		return kind + " (case subject not named)"
+	}
+
 	add := func(label, etype, notes string, tags ...string) {
 		label = strings.TrimSpace(label)
 		if label == "" {
@@ -165,42 +192,33 @@ func buildEntities(c *caseinfo.Case, caseID string) []cbEntity {
 			Source:     "dorkhound:case-file",
 			Tags:       allTags,
 			CaptureIDs: []string{},
-			Status:     "unconfirmed",
+			Status:     entStatusUnconfirmed,
 		})
 	}
 
-	// aliasNote / associateNote produce "Alias of <Name>" only when Name is set,
-	// otherwise a clean fallback so the field doesn't read "Alias of ".
-	aliasNote := func(kind string) string {
-		if name := strings.TrimSpace(c.Name); name != "" {
-			return kind + " of " + name
-		}
-		return kind + " (case subject not named)"
-	}
-
-	if name := strings.TrimSpace(c.Name); name != "" {
-		add(name, "person", "Subject of case (from dorkhound case file).", "subject")
+	if name != "" {
+		add(name, entTypePerson, "Subject of case (from dorkhound case file).", "subject")
 	}
 	for _, alias := range c.Aliases {
-		add(alias, "username", aliasNote("Alias"), "alias")
+		add(alias, entTypeUsername, aliasNote("Alias"), "alias")
 	}
 	for _, assoc := range c.Associates {
-		add(assoc, "person", aliasNote("Known associate"), "associate")
+		add(assoc, entTypePerson, aliasNote("Known associate"), "associate")
 	}
 	for _, email := range c.Emails {
-		add(strings.ToLower(email), "email", "")
+		add(strings.ToLower(email), entTypeEmail, "")
 	}
 	for _, phone := range c.Phones {
-		add(phone, "phone", "")
+		add(phone, entTypePhone, "")
 	}
 	for _, username := range c.Usernames {
-		add(strings.TrimPrefix(strings.TrimSpace(username), "@"), "username", "")
+		add(strings.TrimPrefix(strings.TrimSpace(username), "@"), entTypeUsername, "")
 	}
 	if loc := strings.TrimSpace(c.Location); loc != "" {
-		add(loc, "location", "Last known location")
+		add(loc, entTypeLocation, "Last known location")
 	}
-	if url := strings.TrimSpace(c.PhotoURL); url != "" {
-		add(url, "url", "Photo URL for reverse image search", "photo")
+	if photo := strings.TrimSpace(c.PhotoURL); photo != "" {
+		add(photo, entTypeURL, "Photo URL for reverse image search", "photo")
 	}
 	return entities
 }
@@ -233,89 +251,115 @@ func buildCaptures(c *caseinfo.Case, dorks []dork.Dork, caseID, engine, timestam
 	return captures
 }
 
-// linkEntitiesAndCaptures walks the entity/capture cross-product once and
-// records bidirectional links where an entity's value matches a word in a
-// capture's URL or query text. Matching is word-boundary, case-insensitive, and
-// skips labels shorter than minLinkableLabel to avoid incidental matches like
-// `"JD"` hitting `"adjusted"` or `"jdoe"` hitting `"jdoe42"`. The linear pass
-// is fine in practice: a large run is ~500 captures × ~20 entities = 10k
-// comparisons.
+// linkEntitiesAndCaptures records bidirectional links where every
+// alphanumeric token (≥ minLinkableLabel chars) of an entity's label
+// appears in a capture's URL or query text. Matching is case-insensitive
+// token-set lookup — the capture haystack is tokenized once, then each
+// entity is an O(label-tokens) lookup. Compound labels like
+// "jane@example.com" tokenize to {jane, example, com} and match only when
+// all three appear; single-token labels like "jdoe42" match when the
+// token is in the haystack. Sub-floor tokens like "jd" are excluded so
+// they can't drag a compound label through on a single weak hit.
 //
-// Email addresses are split-and-matched on the local-part too, so an email
-// entity links to a capture that searched for just the local part — that's
-// the actual dork pattern dorks_email.go generates.
+// Each (entity, capture) pair is visited at most once per capture, so no
+// per-link dedupe is needed for EntityIDs. CaptureIDs uses slices.Contains
+// because the same capture ID can repeat across iterations only via
+// hash-collision-truncation, which is allowed by the encoding but
+// vanishingly rare; the guard is cheap and removes the theoretical bug.
 func linkEntitiesAndCaptures(entities []cbEntity, captures []cbCapture) {
 	if len(entities) == 0 || len(captures) == 0 {
 		return
 	}
 	type entRef struct {
-		re  *regexp.Regexp
-		idx int
+		tokens []string
+		idx    int
 	}
 	var refs []entRef
 	for i, e := range entities {
-		label := strings.ToLower(strings.TrimSpace(e.Label))
-		if len(label) < minLinkableLabel {
+		toks := significantTokens(e.Label)
+		if len(toks) == 0 {
 			continue
 		}
-		re, err := regexp.Compile(`(?i)\b` + regexp.QuoteMeta(label) + `\b`)
-		if err != nil {
-			continue
-		}
-		refs = append(refs, entRef{re: re, idx: i})
+		refs = append(refs, entRef{tokens: toks, idx: i})
 	}
 	for ci := range captures {
-		hay := captures[ci].URL + " " + captures[ci].Content.Text
-		entSeen := make(map[string]bool)
+		hay := tokenize(captures[ci].URL + " " + captures[ci].Content.Text)
 		for _, r := range refs {
-			if !r.re.MatchString(hay) {
+			if !allInSet(r.tokens, hay) {
 				continue
 			}
-			entID := entities[r.idx].ID
-			if entSeen[entID] {
-				continue
+			captures[ci].EntityIDs = append(captures[ci].EntityIDs, entities[r.idx].ID)
+			if !slices.Contains(entities[r.idx].CaptureIDs, captures[ci].ID) {
+				entities[r.idx].CaptureIDs = append(entities[r.idx].CaptureIDs, captures[ci].ID)
 			}
-			entSeen[entID] = true
-			captures[ci].EntityIDs = append(captures[ci].EntityIDs, entID)
-			entities[r.idx].CaptureIDs = appendUnique(entities[r.idx].CaptureIDs, captures[ci].ID)
 		}
 	}
 }
 
-func appendUnique(s []string, v string) []string {
-	for _, e := range s {
-		if e == v {
-			return s
+// significantTokens returns the ≥ minLinkableLabel alphanumeric tokens of
+// label, lowercased. Returns nil when no token meets the floor — those
+// labels are emitted as entities but skipped for linking.
+func significantTokens(label string) []string {
+	all := tokenize(label)
+	var out []string
+	for t := range all {
+		if len(t) >= minLinkableLabel {
+			out = append(out, t)
 		}
 	}
-	return append(s, v)
+	return out
+}
+
+func allInSet(tokens []string, set map[string]bool) bool {
+	for _, t := range tokens {
+		if !set[t] {
+			return false
+		}
+	}
+	return true
+}
+
+// tokenize splits s on every byte outside [a-zA-Z0-9] and returns the set of
+// lowercased non-empty tokens. Used as a one-shot index per capture so the
+// per-entity lookup in linkEntitiesAndCaptures is O(1). ASCII-only by
+// design — matches the labels we produce (lowercased emails, trimmed
+// usernames, locations).
+func tokenize(s string) map[string]bool {
+	out := make(map[string]bool)
+	var b strings.Builder
+	flush := func() {
+		if b.Len() == 0 {
+			return
+		}
+		out[strings.ToLower(b.String())] = true
+		b.Reset()
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') {
+			b.WriteByte(c)
+			continue
+		}
+		flush()
+	}
+	flush()
+	return out
 }
 
 // cbCaseID produces a stable case ID derived from name/dob/location so reruns
 // of the same case file resolve to the same CaseBandit case on reimport.
 func cbCaseID(c *caseinfo.Case) string {
-	sum := sha256.Sum256([]byte(strings.Join([]string{
+	return "dh-" + stableID(12,
 		strings.TrimSpace(c.Name),
 		strings.TrimSpace(c.DOB),
 		strings.TrimSpace(c.Location),
-	}, "\x00")))
-	return "dh-" + hex.EncodeToString(sum[:12])
+	)
 }
 
 func cbEntityID(caseID, etype, label string) string {
-	sum := sha256.Sum256([]byte(strings.Join([]string{
-		caseID,
-		etype,
-		strings.ToLower(strings.TrimSpace(label)),
-	}, "\x00")))
-	return "dh-ent-" + hex.EncodeToString(sum[:12])
+	return "dh-ent-" + stableID(12, caseID, etype, strings.ToLower(strings.TrimSpace(label)))
 }
 
 func cbCaptureID(category, label, url string) string {
-	sum := sha256.Sum256([]byte(strings.Join([]string{
-		category,
-		label,
-		url,
-	}, "\x00")))
-	return "dh-cap-" + hex.EncodeToString(sum[:12])
+	return "dh-cap-" + stableID(12, category, label, url)
 }

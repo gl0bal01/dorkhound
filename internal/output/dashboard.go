@@ -2,9 +2,7 @@ package output
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -154,13 +152,7 @@ func randomCSPNonce() (string, error) {
 // invalid in CSS selectors (`:`, `.`, space) can never break querySelector
 // calls in the dashboard JS.
 func dashboardRowID(category, label, url string, index int) string {
-	sum := sha256.Sum256([]byte(strings.Join([]string{
-		category,
-		label,
-		url,
-		fmt.Sprintf("%d", index),
-	}, "\x00")))
-	return sanitizeIDPrefix(category) + ":" + hex.EncodeToString(sum[:12])
+	return sanitizeIDPrefix(category) + ":" + stableID(12, category, label, url, fmt.Sprintf("%d", index))
 }
 
 // sanitizeIDPrefix replaces every byte outside [A-Za-z0-9_-] with '_' so
@@ -184,10 +176,9 @@ func sanitizeIDPrefix(s string) string {
 }
 
 func dashboardCaseID(c *caseinfo.Case) string {
-	sum := sha256.Sum256([]byte(strings.Join([]string{
+	return stableID(16,
 		strings.TrimSpace(c.Name),
 		strings.TrimSpace(c.DOB),
 		strings.TrimSpace(c.Location),
-	}, "\x00")))
-	return hex.EncodeToString(sum[:16])
+	)
 }

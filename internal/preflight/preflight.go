@@ -35,16 +35,32 @@ type Options struct {
 	AllowPrivateNetwork bool          // allow loopback/private/link-local targets
 }
 
-// Status records the outcome of probing one dork's direct URL. Exactly one of
-// Alive/Dead/Blocked/Unchecked is true for any given Status.
+// Disposition is the outcome of probing one dork's direct URL. Exactly one
+// value applies to any given Status. The iota typing prevents the "multiple
+// bool flags accidentally set true" footgun the previous 4-bool encoding
+// allowed.
+type Disposition int
+
+const (
+	DispositionAlive     Disposition = iota // 2xx/3xx response
+	DispositionDead                         // 4xx/5xx response or transport/DNS/TLS error
+	DispositionBlocked                      // SSRF guard refused (private/loopback/link-local target)
+	DispositionUnchecked                    // probe was aborted before completion (e.g. ctx cancel)
+)
+
+// Status records the outcome of probing one dork's direct URL.
 type Status struct {
-	URL        string
-	StatusCode int    // HTTP status code; 0 if request failed
-	Err        string // non-empty on transport/TLS/timeout errors
-	Dead       bool   // 4xx/5xx response or transport/DNS/TLS error
-	Blocked    bool   // SSRF guard refused (private/loopback/link-local target)
-	Unchecked  bool   // probe was aborted before completion (e.g. ctx cancel)
+	URL         string
+	StatusCode  int    // HTTP status code; 0 if request failed
+	Err         string // non-empty on transport/TLS/timeout errors
+	Disposition Disposition
 }
+
+// Convenience predicates for callers and tests.
+func (s Status) Alive() bool     { return s.Disposition == DispositionAlive }
+func (s Status) Dead() bool      { return s.Disposition == DispositionDead }
+func (s Status) Blocked() bool   { return s.Disposition == DispositionBlocked }
+func (s Status) Unchecked() bool { return s.Disposition == DispositionUnchecked }
 
 // Report summarizes a preflight pass.
 type Report struct {
@@ -102,15 +118,16 @@ func Run(ctx context.Context, dorks []dork.Dork, opts Options) ([]dork.Dork, Rep
 		d   dork.Dork
 	}
 
+	// statuses is sized to len(dorks); a nil slot means "non-direct dork,
+	// pass-through". A non-nil slot means "direct URL we tried to probe" —
+	// the Status itself records whether the probe completed and how.
 	var report Report
-	statusByIdx := make(map[int]Status)
+	statuses := make([]*Status, len(dorks))
 
 	var jobs []job
-	directIdx := make(map[int]bool)
 	for i, d := range dorks {
 		if isDirectURL(d.Query) {
 			jobs = append(jobs, job{i, d})
-			directIdx[i] = true
 			report.Checked++
 		} else {
 			report.Skipped++
@@ -132,7 +149,7 @@ func Run(ctx context.Context, dorks []dork.Dork, opts Options) ([]dork.Dork, Rep
 			for j := range jobCh {
 				st := probe(ctx, client, j.d.Query, opts.UserAgent, opts.AllowPrivateNetwork)
 				mu.Lock()
-				statusByIdx[j.idx] = st
+				statuses[j.idx] = &st
 				mu.Unlock()
 				if opts.RateLimit > 0 {
 					select {
@@ -160,32 +177,32 @@ func Run(ctx context.Context, dorks []dork.Dork, opts Options) ([]dork.Dork, Rep
 
 	survivors := make([]dork.Dork, 0, len(dorks))
 	for i, d := range dorks {
-		if !directIdx[i] {
-			survivors = append(survivors, d)
-			continue
-		}
-		st, ok := statusByIdx[i]
-		if !ok {
+		st := statuses[i]
+		switch {
+		case st == nil && isDirectURL(d.Query):
 			// Probe never completed (context canceled before scheduling).
 			// Preserve the dork as unchecked so the operator can see the lead
 			// was not validated, rather than silently dropping it.
 			report.Unchecked++
-			report.Results = append(report.Results, Status{URL: d.Query, Unchecked: true})
+			report.Results = append(report.Results, Status{URL: d.Query, Disposition: DispositionUnchecked})
 			survivors = append(survivors, d)
-			continue
-		}
-		report.Results = append(report.Results, st)
-		switch {
-		case st.Blocked:
-			report.Blocked++
-		case st.Dead:
-			report.Dead++
-		case st.Unchecked:
-			report.Unchecked++
+		case st == nil:
+			// Non-direct dork: search-engine-wrapped, always passes through.
 			survivors = append(survivors, d)
 		default:
-			report.Alive++
-			survivors = append(survivors, d)
+			report.Results = append(report.Results, *st)
+			switch st.Disposition {
+			case DispositionBlocked:
+				report.Blocked++
+			case DispositionDead:
+				report.Dead++
+			case DispositionUnchecked:
+				report.Unchecked++
+				survivors = append(survivors, d)
+			default: // DispositionAlive
+				report.Alive++
+				survivors = append(survivors, d)
+			}
 		}
 	}
 
@@ -198,33 +215,31 @@ func isDirectURL(q string) bool {
 
 func probe(ctx context.Context, client *http.Client, target, ua string, allowPrivateNetwork bool) Status {
 	st := Status{URL: target}
+	classify := func(err error) Disposition {
+		// errors.Is unwraps the *url.Error wrapper http.Client puts around
+		// dial-time refusals, so the sentinel survives transparently.
+		if errors.Is(err, ErrBlockedTarget) {
+			return DispositionBlocked
+		}
+		return DispositionDead
+	}
+
 	if err := validateProbeTarget(ctx, target, allowPrivateNetwork); err != nil {
 		st.Err = err.Error()
-		if errors.Is(err, ErrBlockedTarget) {
-			st.Blocked = true
-		} else {
-			st.Dead = true
-		}
+		st.Disposition = classify(err)
 		return st
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, target, nil)
 	if err != nil {
 		st.Err = err.Error()
-		st.Dead = true
+		st.Disposition = DispositionDead
 		return st
 	}
 	req.Header.Set("User-Agent", ua)
 	resp, err := client.Do(req)
 	if err != nil {
 		st.Err = err.Error()
-		// Distinguish dial-time SSRF refusals from generic transport failures
-		// so the operator sees Blocked separately from Dead. http.Client wraps
-		// the dialer error in *url.Error; errors.Is unwraps it transparently.
-		if errors.Is(err, ErrBlockedTarget) {
-			st.Blocked = true
-		} else {
-			st.Dead = true
-		}
+		st.Disposition = classify(err)
 		return st
 	}
 	defer resp.Body.Close()
@@ -239,7 +254,7 @@ func probe(ctx context.Context, client *http.Client, target, ua string, allowPri
 		}
 	}
 	if st.StatusCode >= 400 {
-		st.Dead = true
+		st.Disposition = DispositionDead
 	}
 	return st
 }
