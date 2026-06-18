@@ -26,6 +26,12 @@ Bumping `schema_version` is required for any incompatible change.
 
 - `schema_version` MUST be `dorkhound-casebandit-v1` for this revision.
 - `generated_at` is RFC 3339 / ISO 8601 in UTC.
+- **Naming convention:** the envelope (`schema_version`, `generated_at`,
+  `generator.generated_at`) uses snake_case; everything inside `case` /
+  `entities` / `captures` uses camelCase to mirror CaseBandit's
+  `shared/types.ts` interfaces verbatim. Consumers should treat the
+  envelope as a dorkhound-specific wrapper and the inner objects as
+  CaseBandit-native.
 - `entities` and `captures` are flat arrays. `case.entities` /
   `case.captures` are intentionally NOT pre-populated to keep the document
   small; CaseBandit's importer attaches them to the case by `caseId`.

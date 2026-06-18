@@ -11,12 +11,19 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/gl0bal01/dorkhound/internal/caseinfo"
 	"github.com/gl0bal01/dorkhound/internal/dork"
 )
+
+// minLinkableLabel is the floor for entity-label substring matching against
+// capture content. Labels shorter than this (e.g. "JD") would create too many
+// incidental cross-links inside URLs and English prose. Two-character labels
+// are still emitted as entities — they just aren't auto-linked to captures.
+const minLinkableLabel = 3
 
 // caseBanditSchemaVersion is the wire-format slug. Bump on incompatible
 // changes — see docs/casebandit-bridge.md "Versioning".
@@ -60,13 +67,17 @@ type cbEntity struct {
 }
 
 type cbCapture struct {
-	ID        string        `json:"id"`
-	CaseID    string        `json:"caseId"`
-	Timestamp string        `json:"timestamp"`
-	URL       string        `json:"url"`
-	Title     string        `json:"title"`
-	Source    string        `json:"source,omitempty"`
-	Type      string        `json:"type"`
+	ID        string `json:"id"`
+	CaseID    string `json:"caseId"`
+	Timestamp string `json:"timestamp"`
+	URL       string `json:"url"`
+	Title     string `json:"title"`
+	Source    string `json:"source,omitempty"`
+	Type      string `json:"type"`
+	// Status mirrors CaseBandit's Capture.status traffic-light enum
+	// (`blue` | `green` | `yellow` | `red`). The writer intentionally
+	// leaves it unset — dorkhound generates leads, not graded captures.
+	// CaseBandit's importer assigns the initial status.
 	Status    string        `json:"status,omitempty"`
 	Tags      []string      `json:"tags"`
 	Content   cbCaptureBody `json:"content"`
@@ -103,13 +114,13 @@ func CaseBandit(w io.Writer, c *caseinfo.Case, dorks []dork.Dork, opts CaseBandi
 	caseID := cbCaseID(c)
 	timestamp := opts.GeneratedAt.UTC().Format(time.RFC3339)
 
-	entities, entityByValue := buildEntities(c, caseID)
+	entities := buildEntities(c, caseID)
 	captures := buildCaptures(c, dorks, caseID, opts.Engine, timestamp)
 
 	// Cross-link: every capture whose URL/label/text contains an entity
 	// value gets that entity in extractedEntities, and the entity gets the
 	// capture ID in captureIds. Importer can rely on either direction.
-	linkEntitiesAndCaptures(entities, entityByValue, captures)
+	linkEntitiesAndCaptures(entities, captures)
 
 	doc := cbDocument{
 		SchemaVersion: caseBanditSchemaVersion,
@@ -135,16 +146,21 @@ func CaseBandit(w io.Writer, c *caseinfo.Case, dorks []dork.Dork, opts CaseBandi
 	return enc.Encode(doc)
 }
 
-func buildEntities(c *caseinfo.Case, caseID string) ([]cbEntity, map[string]int) {
+func buildEntities(c *caseinfo.Case, caseID string) []cbEntity {
 	var entities []cbEntity
-	byValue := make(map[string]int)
+	seen := make(map[string]bool)
 	add := func(label, etype, notes string, tags ...string) {
-		key := etype + ":" + strings.ToLower(strings.TrimSpace(label))
-		if _, exists := byValue[key]; exists {
+		label = strings.TrimSpace(label)
+		if label == "" {
 			return
 		}
+		key := etype + ":" + strings.ToLower(label)
+		if seen[key] {
+			return
+		}
+		seen[key] = true
 		allTags := append([]string{"dorkhound", "imported"}, tags...)
-		ent := cbEntity{
+		entities = append(entities, cbEntity{
 			ID:         cbEntityID(caseID, etype, label),
 			CaseID:     caseID,
 			Label:      label,
@@ -154,37 +170,43 @@ func buildEntities(c *caseinfo.Case, caseID string) ([]cbEntity, map[string]int)
 			Tags:       allTags,
 			CaptureIDs: []string{},
 			Status:     "unconfirmed",
-		}
-		byValue[key] = len(entities)
-		entities = append(entities, ent)
+		})
 	}
 
-	if strings.TrimSpace(c.Name) != "" {
-		notes := "Subject of case (from dorkhound case file)."
-		add(c.Name, "person", notes, "subject")
+	// aliasNote / associateNote produce "Alias of <Name>" only when Name is set,
+	// otherwise a clean fallback so the field doesn't read "Alias of ".
+	aliasNote := func(kind string) string {
+		if name := strings.TrimSpace(c.Name); name != "" {
+			return kind + " of " + name
+		}
+		return kind + " (case subject not named)"
+	}
+
+	if name := strings.TrimSpace(c.Name); name != "" {
+		add(name, "person", "Subject of case (from dorkhound case file).", "subject")
 	}
 	for _, alias := range c.Aliases {
-		add(alias, "username", "Alias of "+c.Name, "alias")
+		add(alias, "username", aliasNote("Alias"), "alias")
 	}
 	for _, assoc := range c.Associates {
-		add(assoc, "person", "Known associate of "+c.Name, "associate")
+		add(assoc, "person", aliasNote("Known associate"), "associate")
 	}
 	for _, email := range c.Emails {
-		add(strings.ToLower(strings.TrimSpace(email)), "email", "")
+		add(strings.ToLower(email), "email", "")
 	}
 	for _, phone := range c.Phones {
-		add(strings.TrimSpace(phone), "phone", "")
+		add(phone, "phone", "")
 	}
 	for _, username := range c.Usernames {
 		add(strings.TrimPrefix(strings.TrimSpace(username), "@"), "username", "")
 	}
-	if strings.TrimSpace(c.Location) != "" {
-		add(c.Location, "location", "Last known location")
+	if loc := strings.TrimSpace(c.Location); loc != "" {
+		add(loc, "location", "Last known location")
 	}
-	if strings.TrimSpace(c.PhotoURL) != "" {
-		add(c.PhotoURL, "url", "Photo URL for reverse image search", "photo")
+	if url := strings.TrimSpace(c.PhotoURL); url != "" {
+		add(url, "url", "Photo URL for reverse image search", "photo")
 	}
-	return entities, byValue
+	return entities
 }
 
 func buildCaptures(c *caseinfo.Case, dorks []dork.Dork, caseID, engine, timestamp string) []cbCapture {
@@ -216,35 +238,61 @@ func buildCaptures(c *caseinfo.Case, dorks []dork.Dork, caseID, engine, timestam
 }
 
 // linkEntitiesAndCaptures walks the entity/capture cross-product once and
-// records bidirectional links where an entity's literal value appears in a
-// capture's URL or query text. The linear pass is fine in practice — even a
-// large run is ~500 captures × ~20 entities = 10k comparisons.
-func linkEntitiesAndCaptures(entities []cbEntity, byValue map[string]int, captures []cbCapture) {
-	if len(entities) == 0 {
+// records bidirectional links where an entity's value matches a word in a
+// capture's URL or query text. Matching is word-boundary, case-insensitive, and
+// skips labels shorter than minLinkableLabel to avoid incidental matches like
+// `"JD"` hitting `"adjusted"` or `"jdoe"` hitting `"jdoe42"`. The linear pass
+// is fine in practice: a large run is ~500 captures × ~20 entities = 10k
+// comparisons.
+//
+// Email addresses are split-and-matched on the local-part too, so an email
+// entity links to a capture that searched for just the local part — that's
+// the actual dork pattern dorks_email.go generates.
+func linkEntitiesAndCaptures(entities []cbEntity, captures []cbCapture) {
+	if len(entities) == 0 || len(captures) == 0 {
 		return
 	}
 	type entRef struct {
-		label, etype string
-		idx          int
+		re  *regexp.Regexp
+		idx int
 	}
-	refs := make([]entRef, 0, len(entities))
+	var refs []entRef
 	for i, e := range entities {
-		v := strings.ToLower(strings.TrimSpace(e.Label))
-		if v == "" {
+		label := strings.ToLower(strings.TrimSpace(e.Label))
+		if len(label) < minLinkableLabel {
 			continue
 		}
-		refs = append(refs, entRef{label: v, etype: e.Type, idx: i})
+		re, err := regexp.Compile(`(?i)\b` + regexp.QuoteMeta(label) + `\b`)
+		if err != nil {
+			continue
+		}
+		refs = append(refs, entRef{re: re, idx: i})
 	}
-	_ = byValue // reserved for future O(1) lookups; intentionally unused
 	for ci := range captures {
-		hay := strings.ToLower(captures[ci].URL + " " + captures[ci].Content.Text)
+		hay := captures[ci].URL + " " + captures[ci].Content.Text
+		entSeen := make(map[string]bool)
 		for _, r := range refs {
-			if strings.Contains(hay, r.label) {
-				captures[ci].EntityIDs = append(captures[ci].EntityIDs, entities[r.idx].ID)
-				entities[r.idx].CaptureIDs = append(entities[r.idx].CaptureIDs, captures[ci].ID)
+			if !r.re.MatchString(hay) {
+				continue
 			}
+			entID := entities[r.idx].ID
+			if entSeen[entID] {
+				continue
+			}
+			entSeen[entID] = true
+			captures[ci].EntityIDs = append(captures[ci].EntityIDs, entID)
+			entities[r.idx].CaptureIDs = appendUnique(entities[r.idx].CaptureIDs, captures[ci].ID)
 		}
 	}
+}
+
+func appendUnique(s []string, v string) []string {
+	for _, e := range s {
+		if e == v {
+			return s
+		}
+	}
+	return append(s, v)
 }
 
 func buildCaseNotes(c *caseinfo.Case) string {

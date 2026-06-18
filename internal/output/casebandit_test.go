@@ -143,6 +143,109 @@ func TestCaseBanditExport_StableIDs(t *testing.T) {
 	}
 }
 
+func TestCaseBanditExport_RejectsEmptyLabel(t *testing.T) {
+	t.Parallel()
+	c := &caseinfo.Case{
+		Name:      "",                  // empty subject
+		Aliases:   []string{"", "   "}, // whitespace-only
+		Emails:    []string{"jane@example.com"},
+		Usernames: []string{"@jdoe42"},
+	}
+	var buf bytes.Buffer
+	if err := CaseBandit(&buf, c, nil, CaseBanditExportOptions{}); err != nil {
+		t.Fatalf("CaseBandit: %v", err)
+	}
+	var doc cbDocument
+	if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+		t.Fatalf("unmarshalling: %v", err)
+	}
+	for _, e := range doc.Entities {
+		if strings.TrimSpace(e.Label) == "" {
+			t.Errorf("emitted entity with empty Label: %+v", e)
+		}
+		// Alias note must not read "Alias of " when the case name is empty.
+		if strings.HasSuffix(e.Notes, " of ") {
+			t.Errorf("entity notes %q ends with 'of '; missing-name guard didn't fire", e.Notes)
+		}
+	}
+}
+
+func TestCaseBanditExport_NoSubstringFalsePositives(t *testing.T) {
+	t.Parallel()
+	c := &caseinfo.Case{
+		Name:      "Jane Doe",
+		Usernames: []string{"jd"}, // 2 chars — below minLinkableLabel
+	}
+	dorks := []dork.Dork{
+		// "jd" appears as a substring of "adjusted", but the short-label
+		// floor + word boundary together must prevent a false positive.
+		{Query: "https://example.com/adjusted-records", Category: "records", Region: "global", Label: "adjusted records"},
+	}
+	var buf bytes.Buffer
+	if err := CaseBandit(&buf, c, dorks, CaseBanditExportOptions{Engine: "google"}); err != nil {
+		t.Fatalf("CaseBandit: %v", err)
+	}
+	var doc cbDocument
+	if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+		t.Fatalf("unmarshalling: %v", err)
+	}
+	for _, cap := range doc.Captures {
+		if len(cap.EntityIDs) > 0 {
+			// Only the "jane doe" entity could plausibly link, but the dork
+			// content does not contain "Jane Doe" as a word, so we expect zero.
+			for _, eid := range cap.EntityIDs {
+				for _, e := range doc.Entities {
+					if e.ID == eid && e.Label == "jd" {
+						t.Errorf("short-label entity %q linked to capture %q via substring", e.Label, cap.URL)
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestCaseBanditExport_NoDuplicateLinks(t *testing.T) {
+	t.Parallel()
+	c := &caseinfo.Case{
+		Name:   "Jane Doe",
+		Emails: []string{"jane@example.com"},
+	}
+	// Capture text mentions the email twice; link sets must dedupe.
+	dorks := []dork.Dork{
+		{Query: `"jane@example.com" OR "jane@example.com"`, Category: "email", Region: "global", Label: "email twice"},
+	}
+	var buf bytes.Buffer
+	if err := CaseBandit(&buf, c, dorks, CaseBanditExportOptions{Engine: "google"}); err != nil {
+		t.Fatalf("CaseBandit: %v", err)
+	}
+	var doc cbDocument
+	if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+		t.Fatalf("unmarshalling: %v", err)
+	}
+	for _, cap := range doc.Captures {
+		seen := make(map[string]int)
+		for _, id := range cap.EntityIDs {
+			seen[id]++
+		}
+		for id, n := range seen {
+			if n > 1 {
+				t.Errorf("capture %q lists entity %q %d times; want 1", cap.URL, id, n)
+			}
+		}
+	}
+	for _, e := range doc.Entities {
+		seen := make(map[string]int)
+		for _, id := range e.CaptureIDs {
+			seen[id]++
+		}
+		for id, n := range seen {
+			if n > 1 {
+				t.Errorf("entity %q lists capture %q %d times; want 1", e.Label, id, n)
+			}
+		}
+	}
+}
+
 func TestCaseBanditExport_LinksEntitiesToCaptures(t *testing.T) {
 	t.Parallel()
 	c := &caseinfo.Case{

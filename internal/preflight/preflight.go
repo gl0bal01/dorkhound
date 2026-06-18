@@ -8,6 +8,7 @@ package preflight
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -18,6 +19,12 @@ import (
 
 	"github.com/gl0bal01/dorkhound/internal/dork"
 )
+
+// ErrBlockedTarget is returned by the SSRF guard (both validateProbeTarget and
+// dialValidated) when a probe would hit a private/loopback/link-local/multicast
+// address. Check with errors.Is so wrapping by http.Client/url.Error is
+// transparent and resistant to future format changes in Go's stdlib.
+var ErrBlockedTarget = errors.New("blocked private network target")
 
 // Options configures a preflight run.
 type Options struct {
@@ -189,15 +196,11 @@ func isDirectURL(q string) bool {
 	return strings.HasPrefix(q, "http://") || strings.HasPrefix(q, "https://")
 }
 
-// errBlockedTarget marks dial-time SSRF refusals so probe() can classify them
-// as Blocked rather than Dead.
-const errBlockedTarget = "blocked private network target"
-
 func probe(ctx context.Context, client *http.Client, target, ua string, allowPrivateNetwork bool) Status {
 	st := Status{URL: target}
 	if err := validateProbeTarget(ctx, target, allowPrivateNetwork); err != nil {
 		st.Err = err.Error()
-		if strings.Contains(err.Error(), errBlockedTarget) {
+		if errors.Is(err, ErrBlockedTarget) {
 			st.Blocked = true
 		} else {
 			st.Dead = true
@@ -215,8 +218,9 @@ func probe(ctx context.Context, client *http.Client, target, ua string, allowPri
 	if err != nil {
 		st.Err = err.Error()
 		// Distinguish dial-time SSRF refusals from generic transport failures
-		// so the operator sees Blocked separately from Dead.
-		if strings.Contains(err.Error(), errBlockedTarget) {
+		// so the operator sees Blocked separately from Dead. http.Client wraps
+		// the dialer error in *url.Error; errors.Is unwraps it transparently.
+		if errors.Is(err, ErrBlockedTarget) {
 			st.Blocked = true
 		} else {
 			st.Dead = true
@@ -256,11 +260,11 @@ func validateProbeTarget(ctx context.Context, target string, allowPrivateNetwork
 		return fmt.Errorf("missing URL hostname")
 	}
 	if host == "localhost" {
-		return fmt.Errorf("%s: %s", errBlockedTarget, host)
+		return fmt.Errorf("%w: %s", ErrBlockedTarget, host)
 	}
 	if ip := net.ParseIP(host); ip != nil {
 		if isRestrictedIP(ip) {
-			return fmt.Errorf("%s: %s", errBlockedTarget, ip.String())
+			return fmt.Errorf("%w: %s", ErrBlockedTarget, ip.String())
 		}
 		return nil
 	}
@@ -270,7 +274,7 @@ func validateProbeTarget(ctx context.Context, target string, allowPrivateNetwork
 	}
 	for _, addr := range addrs {
 		if isRestrictedIP(addr.IP) {
-			return fmt.Errorf("%s: %s resolves to %s", errBlockedTarget, host, addr.IP.String())
+			return fmt.Errorf("%w: %s resolves to %s", ErrBlockedTarget, host, addr.IP.String())
 		}
 	}
 	return nil
@@ -289,7 +293,7 @@ func dialValidated(ctx context.Context, dialer *net.Dialer, network, addr string
 	}
 	if ip := net.ParseIP(host); ip != nil {
 		if isRestrictedIP(ip) {
-			return nil, fmt.Errorf("%s at dial: %s", errBlockedTarget, ip.String())
+			return nil, fmt.Errorf("%w at dial: %s", ErrBlockedTarget, ip.String())
 		}
 		return dialer.DialContext(ctx, network, addr)
 	}
@@ -299,7 +303,7 @@ func dialValidated(ctx context.Context, dialer *net.Dialer, network, addr string
 	}
 	for _, ip := range addrs {
 		if isRestrictedIP(ip.IP) {
-			return nil, fmt.Errorf("%s at dial: %s resolves to %s", errBlockedTarget, host, ip.IP.String())
+			return nil, fmt.Errorf("%w at dial: %s resolves to %s", ErrBlockedTarget, host, ip.IP.String())
 		}
 	}
 	// Dial the first resolved IP to keep the validated address. This trades
