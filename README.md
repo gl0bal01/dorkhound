@@ -113,7 +113,7 @@ Do not submit or share a lead solely because dorkhound generated it. A generated
 - Preflight HTTP checker: HEAD-probes direct-URL dorks and drops dead links before operator triage
 - Interactive localhost dashboard with per-session notes by default, optional trusted-browser persistence, per-result evidence fields, filter bar, rate-limited "Open batch", keyboard shortcuts
 - TraceLabs submission format export
-- Export formats: discord, json, csv, clipboard, tracelabs
+- Export formats: discord, json, csv, clipboard, tracelabs, casebandit (see [`docs/casebandit-bridge.md`](docs/casebandit-bridge.md))
 - Region filters for US, CA, UK, AU, RU, FR, DE, AT, NL
 - Interactive guided-prompt mode (`-i`)
 - Dork deduplication: collisions across generators are collapsed, highest-priority wins
@@ -132,7 +132,7 @@ Run `dorkhound --help` for the full flag reference. The most commonly used flags
 | `--photo-url` | Photo URL for reverse image search |
 | `--location` / `-l` | Last known location |
 | `--dashboard` | Serve local web dashboard with notes & filters |
-| `--export` | Output format: discord, json, csv, clipboard, tracelabs |
+| `--export` | Output format: discord, json, csv, clipboard, tracelabs, casebandit |
 | `--force-output` | Overwrite an existing `--output` file |
 | `--category` | Category filter (see `--list-categories`) |
 | `--region` | Region filter (see `--list-regions`) |
@@ -178,9 +178,18 @@ Nuclei probes 600+ sites for each username and appends results under category `n
 
 ## Preflight Dead-Link Filter
 
-Probes each dork whose query is a direct public HTTP(S) URL (people-db lookups, Wayback, HIBP, nuclei matched-at URLs, etc.) with an HTTP HEAD request and drops any that return 4xx/5xx or fail to connect. Search-engine-wrapped dorks are passed through untouched — probing `google.com/search?q=...` always returns 200 regardless of result count.
+Probes each dork whose query is a direct public HTTP(S) URL (people-db lookups, Wayback, HIBP, nuclei matched-at URLs, etc.) with an HTTP HEAD request and classifies each result. Search-engine-wrapped dorks are passed through untouched — probing `google.com/search?q=...` always returns 200 regardless of result count.
 
-Preflight blocks private, loopback, link-local, and metadata-style targets by default. This prevents accidental probing of local services or cloud metadata endpoints if a future direct URL source produces an unsafe target.
+Every probe ends in exactly one disposition:
+
+| Disposition | Meaning | In survivors? |
+|-------------|---------|---------------|
+| `alive` | 2xx/3xx response | yes |
+| `dead` | 4xx/5xx response or transport/DNS/TLS error | no |
+| `blocked` | SSRF guard refused (private/loopback/link-local/metadata target) | no |
+| `unchecked` | probe was aborted before completion (e.g. context canceled) | yes |
+
+`blocked` is reported separately from `dead` so operators can distinguish "site refused" from "we never let the dial happen". The SSRF guard runs at both URL-parse time and at dial time (DNS-rebinding-safe), and uses an `errors.Is(err, preflight.ErrBlockedTarget)` sentinel that survives `http.Client` error wrapping.
 
 ```bash
 dorkhound --name "Jane Doe" --emails "jane@example.com" --preflight
@@ -235,8 +244,9 @@ Exports may contain sensitive personal data. Store them in an appropriate case f
 | `csv` | Columns: label, category, region, priority, query, url |
 | `clipboard` | Discord format copied to system clipboard |
 | `tracelabs` | TraceLabs CTF submission checklist |
+| `casebandit` | JSON wire format for [CaseBandit](https://casebandit.com) import (`POST /api/import/dorkhound`) — see [`docs/casebandit-bridge.md`](docs/casebandit-bridge.md) for the v1 schema |
 
-Markdown exports escape user-controlled text and neutralize Discord mentions. CSV exports prefix formula-like cells so spreadsheet software does not execute them as formulas.
+Markdown exports escape user-controlled text and neutralize Discord mentions. CSV exports prefix formula-like cells so spreadsheet software does not execute them as formulas. The CaseBandit export emits stable sha256-prefixed Case/Entity/Capture IDs so reruns of the same case file resolve to the same CaseBandit case on reimport.
 
 ## Shell Completion
 
